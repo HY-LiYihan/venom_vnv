@@ -1,0 +1,5 @@
+/hik_camera:
+  ros__parameters:
+    camera_name: "narrow_stereo"
+    exposure_time: 3000
+    gain: 8.0
