@@ -12,23 +12,28 @@ CMD_ID_STATE = 0x01  # C板状态数据
 CMD_ID_CTRL = 0x02   # 视觉控制指令
 
 
-class VisionCtrlData:
-    """视觉控制数据 (NUC → C板)"""
+class RobotCtrlData:
+    """机器人控制数据 (NUC → C板) - 33字节格式"""
     def __init__(self):
-        self.tracking_state = 0  # 0:丢失, 1:追踪中
-        self.target_pitch = 0.0
-        self.target_yaw = 0.0
-        self.target_pitch_v = 0.0
-        self.target_yaw_v = 0.0
+        self.flags = 0  # 控制标志位
+        self.lx = 0.0
+        self.ly = 0.0
+        self.lz = 0.0
+        self.ax = 0.0
+        self.ay = 0.0
+        self.az = 0.0
+        self.dist = 0.0
+        self.frame_x = 0
+        self.frame_y = 0
 
     def pack(self) -> bytes:
-        """打包为字节流 (小端序)"""
-        return struct.pack('<Bffff',
-                          self.tracking_state,
-                          self.target_pitch,
-                          self.target_yaw,
-                          self.target_pitch_v,
-                          self.target_yaw_v)
+        """打包为字节流 (小端序) - 格式: <B7f2H"""
+        return struct.pack('<B7f2H',
+                          self.flags,
+                          self.lx, self.ly, self.lz,
+                          self.ax, self.ay, self.az,
+                          self.dist,
+                          self.frame_x, self.frame_y)
 
 
 class RobotStateData:
@@ -63,12 +68,12 @@ class RobotStateData:
 
     @staticmethod
     def unpack(data: bytes):
-        """从字节流解包 (小端序)"""
-        if len(data) < 73:
+        """从字节流解包 (小端序) - 72字节格式"""
+        if len(data) < 72:
             return None
 
         state = RobotStateData()
-        unpacked = struct.unpack('<IffffffffHBHHHBHHBBffHHI', data[:73])
+        unpacked = struct.unpack('<I9fBHB3HB2HB2f2HI', data[:72])
 
         state.timestamp_us = unpacked[0]
         state.linear_x = unpacked[1]
@@ -100,7 +105,7 @@ class RobotStateData:
         return state
 
 
-def pack_ctrl_frame(ctrl_data: VisionCtrlData) -> bytes:
+def pack_ctrl_frame(ctrl_data: RobotCtrlData) -> bytes:
     """打包控制帧 (NUC → C板)"""
     data = ctrl_data.pack()
     frame = struct.pack('<BHB', SOF_TX, len(data), CMD_ID_CTRL) + data

@@ -42,12 +42,17 @@ def test_ctrl_frame():
     """测试控制帧打包和 CRC16 校验"""
     print("\n=== 测试控制帧 (NUC→C板) ===")
 
-    ctrl = serial_protocol.VisionCtrlData()
-    ctrl.tracking_state = 1
-    ctrl.target_pitch = 15.5
-    ctrl.target_yaw = -20.3
-    ctrl.target_pitch_v = 0.5
-    ctrl.target_yaw_v = -1.2
+    ctrl = serial_protocol.RobotCtrlData()
+    ctrl.flags = 0x07
+    ctrl.lx = 0.0
+    ctrl.ly = 0.0
+    ctrl.lz = 0.0
+    ctrl.ax = 0.0
+    ctrl.ay = 15.5
+    ctrl.az = -20.3
+    ctrl.dist = 2.5
+    ctrl.frame_x = 640
+    ctrl.frame_y = 360
 
     frame = serial_protocol.pack_ctrl_frame(ctrl)
     print(f"✓ 帧长度: {len(frame)} 字节")
@@ -69,26 +74,25 @@ def test_state_frame():
     """测试状态帧解析和 CRC16 校验"""
     print("\n=== 测试状态帧 (C板→NUC) ===")
 
-    # 构造测试帧
-    state = serial_protocol.RobotStateData()
-    state.timestamp_us = 123456789
-    state.angular_y = 10.5
-    state.angular_z = -15.3
-    state.angular_y_speed = 2.1
-    state.angular_z_speed = -3.5
-    state.current_HP = 400
-    state.game_progress = 3
-
-    # 手动打包（模拟 C 板发送）
+    # 构造完整的 72 字节测试数据
     import struct
-    data = struct.pack('<Iffff2H',
-                       state.timestamp_us,
-                       state.angular_y,
-                       state.angular_z,
-                       state.angular_y_speed,
-                       state.angular_z_speed,
-                       state.current_HP,
-                       state.game_progress)
+    data = struct.pack('<I9fBHB3HB2HB2f2HI',
+                       123456789,      # timestamp_us
+                       1.0, 0.5, 0.0,  # linear_x, y, z
+                       0.2,            # gyro_wz
+                       10.5, -15.3,    # angular_y, z
+                       2.1, -3.5,      # angular_y_speed, z_speed
+                       1.5,            # distance
+                       3,              # game_progress
+                       180,            # stage_remain_time
+                       1,              # center_outpost_occupancy
+                       400, 600, 200,  # current_HP, maximum_HP, shooter_barrel_heat_limit
+                       1,              # power_management
+                       50, 0,          # shooter_17mm/42mm_barrel_heat
+                       33,             # armor_id | HP_deduction_reason
+                       10.0, 28.0,     # launching_frequency, initial_speed
+                       100, 0,         # projectile_allowance_17mm/42mm
+                       0x1F)           # rfid_status
 
     data_len = len(data)
     header = struct.pack('<BHB', serial_protocol.SOF_RX, data_len, serial_protocol.CMD_ID_STATE)
@@ -96,7 +100,7 @@ def test_state_frame():
     crc = crc16(frame_no_crc)
     frame = frame_no_crc + struct.pack('<H', crc)
 
-    print(f"✓ 构造帧长度: {len(frame)} 字节")
+    print(f"✓ 构造帧长度: {len(frame)} 字节 (数据 {data_len} 字节)")
 
     # 解析
     success, parsed = serial_protocol.unpack_state_frame(frame)
@@ -105,7 +109,7 @@ def test_state_frame():
         print(f"✓ 解析成功")
         print(f"  timestamp: {parsed.timestamp_us}")
         print(f"  pitch: {parsed.angular_y:.2f}, yaw: {parsed.angular_z:.2f}")
-        print(f"  HP: {parsed.current_HP}")
+        print(f"  HP: {parsed.current_HP}/{parsed.maximum_HP}")
         return True
     else:
         print(f"❌ 解析失败")
@@ -116,16 +120,16 @@ def test_txrx_loopback(port='/dev/ttyUSB0'):
     """测试完整协议收发 (TX-RX 短接)"""
     print(f"\n=== 测试协议收发回环: {port} ===")
 
-    serial = SerialInterface(port, 921600, 0.5)
+    serial = SerialInterface(port, 115200, 0.5)
     if not serial.connect():
         print("❌ 串口连接失败")
         return False
 
     # 发送控制帧
-    ctrl = serial_protocol.VisionCtrlData()
-    ctrl.tracking_state = 1
-    ctrl.target_pitch = 12.3
-    ctrl.target_yaw = -45.6
+    ctrl = serial_protocol.RobotCtrlData()
+    ctrl.flags = 0x07
+    ctrl.ay = 12.3
+    ctrl.az = -45.6
 
     frame = serial_protocol.pack_ctrl_frame(ctrl)
     serial.write_bytes(frame)
@@ -161,6 +165,6 @@ if __name__ == '__main__':
         print(f"  {name}: {status}")
 
     total = len(results)
-    passed = sum(results)
+    passed = sum(1 for _, result in results if result)
     print(f"\n总计: {passed}/{total} 通过")
 
