@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
-import json
+from geometry_msgs.msg import Twist
+from venom_serial_driver.msg import RobotStatus, GameStatus
 import time
 from .serial_interface import SerialInterface
 from . import serial_protocol
@@ -13,7 +13,7 @@ class SerialDriverNode(Node):
 
         # 声明参数
         self.declare_parameter('port_name', '/dev/ttyUSB0')
-        self.declare_parameter('baud_rate', 921600)
+        self.declare_parameter('baud_rate', 115200)
         self.declare_parameter('timeout', 0.1)
         self.declare_parameter('loop_rate', 50)
 
@@ -38,9 +38,10 @@ class SerialDriverNode(Node):
         self.last_valid_time = time.time()
 
         # 发布者和订阅者
-        self.state_pub = self.create_publisher(String, 'robot_state', 10)
-        self.ctrl_sub = self.create_subscription(
-            String, 'vision_ctrl', self.ctrl_callback, 10)
+        self.robot_status_pub = self.create_publisher(RobotStatus, '/robot_status', 10)
+        self.game_status_pub = self.create_publisher(GameStatus, '/game_status', 10)
+        self.cmd_vel_sub = self.create_subscription(
+            Twist, '/cmd_vel', self.cmd_vel_callback, 10)
 
         # 定时器
         self.timer = self.create_timer(1.0 / rate, self.timer_callback)
@@ -66,18 +67,39 @@ class SerialDriverNode(Node):
             success, state = serial_protocol.unpack_state_frame(bytes(self.rx_buffer))
 
             if success and state:
-                # 发布状态
-                msg = String()
-                msg.data = json.dumps({
-                    'timestamp_us': state.timestamp_us,
-                    'pitch': state.angular_y,
-                    'yaw': state.angular_z,
-                    'pitch_speed': state.angular_y_speed,
-                    'yaw_speed': state.angular_z_speed,
-                    'current_HP': state.current_HP,
-                    'game_progress': state.game_progress
-                })
-                self.state_pub.publish(msg)
+                # 发布机器人状态
+                robot_status = RobotStatus()
+                robot_status.velocity.linear.x = float(state.linear_x)
+                robot_status.velocity.linear.y = float(state.linear_y)
+                robot_status.velocity.linear.z = float(state.linear_z)
+                robot_status.velocity.angular.x = float(state.gyro_wz)
+                robot_status.velocity.angular.y = float(state.angular_y)
+                robot_status.velocity.angular.z = float(state.angular_z)
+                robot_status.angular_speed.angular.y = float(state.angular_y_speed)
+                robot_status.angular_speed.angular.z = float(state.angular_z_speed)
+                self.robot_status_pub.publish(robot_status)
+
+                # 发布比赛状态
+                game_status = GameStatus()
+                game_status.timestamp_us = state.timestamp_us
+                game_status.game_progress = state.game_progress
+                game_status.stage_remain_time = state.stage_remain_time
+                game_status.center_outpost_occupancy = state.center_outpost_occupancy
+                game_status.hp_percentage = float(state.current_HP) / float(state.maximum_HP) if state.maximum_HP > 0 else 0.0
+                game_status.shooter_barrel_heat_limit = state.shooter_barrel_heat_limit
+                game_status.power_management = state.power_management
+                game_status.shooter_17mm_barrel_heat = state.shooter_17mm_barrel_heat
+                game_status.shooter_42mm_barrel_heat = state.shooter_42mm_barrel_heat
+                game_status.armor_id = state.armor_id
+                game_status.hp_deduction_reason = state.HP_deduction_reason
+                game_status.launching_frequency = float(state.launching_frequency)
+                game_status.initial_speed = float(state.initial_speed)
+                game_status.projectile_allowance_17mm = state.projectile_allowance_17mm
+                game_status.projectile_allowance_42mm = state.projectile_allowance_42mm
+                game_status.rfid_status = state.rfid_status
+                game_status.distance = float(state.distance)
+                self.game_status_pub.publish(game_status)
+
                 self.last_valid_time = time.time()
 
                 # 移除已解析的帧
@@ -87,19 +109,23 @@ class SerialDriverNode(Node):
             else:
                 self.rx_buffer.pop(0)
 
-    def ctrl_callback(self, msg):
-        """接收视觉控制指令并发送到串口"""
+    def cmd_vel_callback(self, msg):
+        """接收cmd_vel控制指令并发送到串口"""
         if not self.serial.is_connected():
             return
 
         try:
-            data = json.loads(msg.data)
-            ctrl = serial_protocol.VisionCtrlData()
-            ctrl.tracking_state = data.get('tracking_state', 0)
-            ctrl.target_pitch = data.get('target_pitch', 0.0)
-            ctrl.target_yaw = data.get('target_yaw', 0.0)
-            ctrl.target_pitch_v = data.get('target_pitch_v', 0.0)
-            ctrl.target_yaw_v = data.get('target_yaw_v', 0.0)
+            ctrl = serial_protocol.RobotCtrlData()
+            ctrl.flags = 0x07  # bit0=检测到, bit1=追踪中, bit2=允许开火
+            ctrl.lx = float(msg.linear.x)
+            ctrl.ly = float(msg.linear.y)
+            ctrl.lz = float(msg.linear.z)
+            ctrl.ax = float(msg.angular.x)
+            ctrl.ay = float(msg.angular.y)
+            ctrl.az = float(msg.angular.z)
+            ctrl.dist = 0.0
+            ctrl.frame_x = 640
+            ctrl.frame_y = 360
 
             frame = serial_protocol.pack_ctrl_frame(ctrl)
             self.serial.write_bytes(frame)
