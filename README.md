@@ -90,6 +90,36 @@ ros2 launch venom_bringup relocalization_bringup.launch.py pcd_file:=/path/to/ma
 
 - [安装配置教程](./docs/setup.md)
 - [Point-LIO 说明](./docs/point_lio.md)
+- [串口驱动说明](./docs/venom_serial_driver.md)
+
+## 📦 子项目文档
+
+### 硬件驱动
+- [venom_serial_driver](./docs/venom_serial_driver.md) - DJI C板串口通信驱动
+- [livox_ros_driver2](./driver/livox_ros_driver2/README.md) - Livox 激光雷达驱动
+- [ros2_hik_camera](./driver/ros2_hik_camera/README.md) - 海康工业相机驱动
+- [scout_ros2](./driver/scout_ros2/README.md) - 松灵 Scout 底盘驱动
+
+### 定位与建图
+- [Point-LIO](./docs/point_lio.md) - 激光雷达惯性里程计
+- [small_gicp_relocalization](./docs/small_gicp_relocalization.md) - 点云重定位
+
+### 视觉系统
+- [rm_auto_aim](./docs/rm_auto_aim.md) - 自动瞄准系统
+- [armor_detector](./docs/armor_detector.md) - 装甲板检测
+- [armor_tracker](./docs/armor_tracker.md) - 目标跟踪
+- [rm_vision](./venom_vision/README.md) - 视觉框架
+
+### 系统集成
+- [venom_bringup](./venom_bringup/README.md) - 系统启动配置
+- [rm_gimbal_description](./rm_gimbal_description/README.md) - 云台描述
+
+### 环境配置
+- [安装配置](./docs/setup.md) - 系统安装与配置指南
+- [Point-LIO](./docs/point_lio.md) - 激光雷达惯性里程计
+
+### 系统配置
+- [环境配置](./docs/setup.md) - 系统安装与配置指南
 
 ## 🔧 依赖项
 
