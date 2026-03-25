@@ -28,3 +28,6 @@
 [submodule "driver/ros2_hik_camera"]
 	path = driver/ros2_hik_camera
 	url = https://github.com/HY-LiYihan/ros2_hik_camera.git
+[submodule "driver/venom_serial_driver"]
+	path = driver/venom_serial_driver
+	url = git@github.com:HY-LiYihan/venom_serial_driver.git
