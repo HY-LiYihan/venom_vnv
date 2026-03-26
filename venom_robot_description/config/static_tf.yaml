@@ -1,0 +1,25 @@
+# Static TF configuration for venom robot
+# Each entry defines one static transform published at 1000 Hz
+# Format per transform:
+#   parent_frame: parent frame ID
+#   child_frame:  child frame ID
+#   translation:  [x, y, z] in meters
+#   rotation:     [roll, pitch, yaw] in radians  (RPY, applied in ZYX order)
+#
+# Add any number of entries to build the full static TF tree.
+
+transforms:
+  - parent_frame: base_link
+    child_frame: laser_link
+    translation: [0.0, 0.0, 0.2]
+    rotation: [0.0, 0.0, 0.0]
+
+  - parent_frame: base_link
+    child_frame: imu_link
+    translation: [0.0, 0.0, 0.1]
+    rotation: [0.0, 0.0, 0.0]
+
+  - parent_frame: base_link
+    child_frame: camera_link
+    translation: [0.2, 0.0, 0.15]
+    rotation: [0.0, 0.0, 0.0]
