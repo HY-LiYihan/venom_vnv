@@ -11,7 +11,7 @@ flowchart LR
     serial["venom_serial_driver\nserial_node"]
     cboard["DJI C-board\n(serial)"]
 
-    nav -->|"/cmd_vel\nTwist"| serial
+    nav -->|"/venom_cmd_vel\nTwist"| serial
     aim -->|"/auto_aim\nAutoAimCmd"| serial
     serial -->|"UART TX"| cboard
     cboard -->|"UART RX"| serial
@@ -26,11 +26,17 @@ flowchart LR
 
 ## Topics by Module
 
+### Teleop (`venom_teleop`)
+
+| Direction | Topic | Message Type | Publisher / Subscriber | Description |
+|---|---|---|---|---|
+| Publish | `/venom_cmd_vel` | `geometry_msgs/Twist` | `venom_teleop` | Keyboard chassis velocity command. `linear.x/y` = translation; `angular.z` = chassis rotation. |
+
 ### Serial Driver (`venom_serial_driver`)
 
 | Direction | Topic | Message Type | Publisher / Subscriber | Description |
 |---|---|---|---|---|
-| Subscribe | `/cmd_vel` | `geometry_msgs/Twist` | nav2 / teleop | Chassis velocity command. Only `linear.x/y/z` are used; angular fields are ignored. |
+| Subscribe | `/venom_cmd_vel` | `geometry_msgs/Twist` | venom_teleop / nav2 | Chassis velocity command. `linear.x/y/z` = translation; `angular.z` = chassis rotation (rad/s). |
 | Subscribe | `/auto_aim` | `venom_serial_driver/AutoAimCmd` | auto-aim controller | Gimbal angle commands and aim state flags merged into the C-board control frame. |
 | Publish | `/robot_status` | `venom_serial_driver/RobotStatus` | `serial_node` | Chassis velocity and gimbal angle feedback from the C-board. |
 | Publish | `/game_status` | `venom_serial_driver/GameStatus` | `serial_node` | RoboMaster game state: HP, heat, game progress, RFID, etc. |
@@ -76,7 +82,8 @@ Sent by the auto-aim controller to `serial_node`. All angle values are in radian
 
 | `RobotCtrlData` field | Source |
 |---|---|
-| `lx / ly / lz` | `/cmd_vel` linear.x/y/z |
+| `lx / ly / lz` | `/venom_cmd_vel` linear.x/y/z |
+| `chassis_wz` | `/venom_cmd_vel` angular.z |
 | `ay` | `pitch` |
 | `az` | `yaw` |
 | `flags` bit 0 | `detected` |
