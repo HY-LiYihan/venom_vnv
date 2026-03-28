@@ -80,6 +80,9 @@ def generate_launch_description():
             'port_name': 'can0',
             'is_scout_mini': 'true',
             'is_omni_wheel': 'false',
+            'odom_frame': 'odom',        # avoid TF conflict with Point-LIO odom
+            'odom_topic_name': 'odom',   # avoid topic conflict with Point-LIO odom
+            'base_frame': 'base_link',
         }.items()
     )
 
