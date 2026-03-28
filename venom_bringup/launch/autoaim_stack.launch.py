@@ -11,17 +11,18 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    vision_dir = get_package_share_directory('rm_vision_bringup')
-    gimbal_dir = get_package_share_directory('rm_gimbal_description')
+    venom_bringup_dir = get_package_share_directory('venom_bringup')
+    robot_description_dir = get_package_share_directory('venom_robot_description')
     camera_dir = get_package_share_directory('hik_camera')
     serial_dir = get_package_share_directory('venom_serial_driver')
     launch_sim_dir = get_package_share_directory('launch_sim')
 
-    node_params = os.path.join(vision_dir, 'config', 'node_params.yaml')
-    launch_params = yaml.safe_load(open(os.path.join(vision_dir, 'config', 'launch_params.yaml')))
+    autoaim_config_dir = os.path.join(venom_bringup_dir, 'config', 'autoaim')
+    node_params = os.path.join(autoaim_config_dir, 'node_params.yaml')
+    launch_params = yaml.safe_load(open(os.path.join(autoaim_config_dir, 'launch_params.yaml')))
     default_ballistic_config = os.path.join(launch_sim_dir, 'config', 'rm42mm.yaml')
     default_camera_params = os.path.join(camera_dir, 'config', 'camera_params.yaml')
-    default_camera_info = 'package://hik_camera/config/camera_info.yaml'
+    default_camera_info = 'package://venom_bringup/config/autoaim/camera_info.yaml'
 
     ballistic_config = LaunchConfiguration('ballistic_config')
     serial_port = LaunchConfiguration('serial_port')
@@ -101,7 +102,7 @@ def generate_launch_description():
 
     robot_description = Command([
         'xacro ',
-        os.path.join(gimbal_dir, 'urdf', 'rm_gimbal.urdf.xacro'),
+        os.path.join(robot_description_dir, 'urdf', 'rm_gimbal.urdf.xacro'),
         ' xyz:=', launch_params['odom2camera']['xyz'],
         ' rpy:=', launch_params['odom2camera']['rpy'],
     ])
