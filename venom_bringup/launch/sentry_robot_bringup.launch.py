@@ -1,8 +1,8 @@
 """Sentry robot bringup launch file.
 
 Starts the Livox MID360 lidar driver, pointcloud-to-laserscan converter,
-IMU dead-reckoning odometry (odom->base_link TF and /odom topic), and
-sentry robot description TF tree. No chassis driver is included as the
+EKF-based odometry (odom->base_link TF and /odom topic via robot_localization),
+and sentry robot description TF tree. No chassis driver is included as the
 sentry platform does not have base control at this stage.
 """
 
@@ -72,17 +72,14 @@ def generate_launch_description():
         ]
     )
 
-    imu_params = os.path.join(venom_bringup_dir, 'config', 'sentry_imu.yaml')
+    ekf_config = os.path.join(venom_bringup_dir, 'config', 'ekf.yaml')
 
-    # IMU dead-reckoning node — publishes /odom and odom->base_link TF.
-    # IMU measurements are rotated from laser_link to base_link before integration
-    # using the extrinsic parameters in sentry_imu.yaml.
-    imu_odom_node = Node(
-        package='venom_bringup',
-        executable='imu_odom_publisher',
-        name='imu_odom_publisher',
+    ekf_node = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='ekf_filter_node',
         output='screen',
-        parameters=[imu_params],
+        parameters=[ekf_config],
     )
 
     robot_description_launch = IncludeLaunchDescription(
@@ -103,7 +100,7 @@ def generate_launch_description():
     return LaunchDescription([
         declare_headless,
         livox_driver_node,
-        imu_odom_node,
+        ekf_node,
         pointcloud_to_laserscan_node,
         robot_description_launch,
         rviz_node,
