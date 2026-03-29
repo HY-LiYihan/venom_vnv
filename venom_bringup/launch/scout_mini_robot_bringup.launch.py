@@ -5,9 +5,11 @@ Scout Mini base driver, and robot description TF tree. Intended as the
 base hardware layer for mapping, relocalization, and navigation tasks.
 
 Odometry source is selectable via the 'odom_source' argument:
-  wheel (default) -- Scout Mini wheel encoder odometry (odom -> base_link)
-  laser           -- rf2o laser odometry (odom -> base_link); wheel odometry
-                     is isolated under scout_odom -> scout_base_link and discarded
+  wheel -- Scout Mini wheel encoder odometry (odom -> base_link, ~50 Hz)
+  laser -- rf2o laser odometry (odom -> base_link, 10 Hz);
+           wheel odometry isolated under scout_odom -> scout_base_link and discarded
+  ekf   -- rf2o (10 Hz) fused with Livox IMU (~200 Hz) via EKF (odom -> base_link, 50 Hz);
+           wheel odometry isolated under scout_odom -> scout_base_link and discarded
 """
 
 import os
@@ -36,8 +38,13 @@ def generate_launch_description():
     )
     declare_odom_source = DeclareLaunchArgument(
         'odom_source',
-        default_value='laser',
-        description="Odometry source: 'wheel' for wheel encoder odometry, 'laser' for rf2o laser odometry"
+        default_value='ekf',
+        description=(
+            "Odometry source: "
+            "'wheel' = wheel encoder (odom->base_link, ~50 Hz); "
+            "'laser' = rf2o laser odometry (odom->base_link, 10 Hz); "
+            "'ekf'   = rf2o + IMU fused by EKF (odom->base_link, 50 Hz)"
+        )
     )
 
     livox_config_path = os.path.join(livox_driver_dir, 'config', 'MID360_config.json')
@@ -84,9 +91,8 @@ def generate_launch_description():
     )
 
     # In wheel mode:  odom_frame=odom,       odom_topic=odom,       base_frame=base_link
-    # In laser mode:  odom_frame=scout_odom,  odom_topic=scout_odom, base_frame=scout_base_link
-    # The laser-mode names isolate the wheel TF tree so it is discarded and never
-    # conflicts with the rf2o odom -> base_link chain.
+    # In laser/ekf:   odom_frame=scout_odom,  odom_topic=scout_odom, base_frame=scout_base_link
+    # Wheel odometry is isolated in laser/ekf modes so it doesn't conflict with the authoritative odom->base_link.
     scout_base_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(scout_base_dir, 'launch', 'scout_mini_base.launch.py')
@@ -107,9 +113,26 @@ def generate_launch_description():
         }.items()
     )
 
-    # rf2o publishes raw laser odometry to /odom_rf2o for EKF input.
-    # publish_tf is disabled — ekf_scout_node owns the odom->base_link TF.
-    rf2o_node = Node(
+    # laser mode: rf2o publishes odom->base_link TF and /odom directly (10 Hz)
+    rf2o_laser_node = Node(
+        package='rf2o_laser_odometry',
+        executable='rf2o_laser_odometry_node',
+        name='rf2o_laser_odometry',
+        output='screen',
+        parameters=[{
+            'laser_scan_topic': '/scan',
+            'odom_topic': '/odom',
+            'publish_tf': True,
+            'base_frame_id': 'base_link',
+            'odom_frame_id': 'odom',
+            'init_pose_from_topic': '',
+            'freq': 10.0,
+        }],
+        condition=IfCondition(PythonExpression(["'", odom_source, "' == 'laser'"]))
+    )
+
+    # ekf mode: rf2o publishes raw odometry to /odom_rf2o (no TF) for EKF input
+    rf2o_ekf_node = Node(
         package='rf2o_laser_odometry',
         executable='rf2o_laser_odometry_node',
         name='rf2o_laser_odometry',
@@ -123,10 +146,10 @@ def generate_launch_description():
             'init_pose_from_topic': '',
             'freq': 10.0,
         }],
-        condition=IfCondition(PythonExpression(["'", odom_source, "' == 'laser'"]))
+        condition=IfCondition(PythonExpression(["'", odom_source, "' == 'ekf'"]))
     )
 
-    # EKF node: fuses rf2o (10 Hz) + Livox IMU (~200 Hz) -> /odom at 50 Hz.
+    # ekf mode: EKF fuses rf2o (10 Hz) + Livox IMU (~200 Hz) -> /odom at 50 Hz
     ekf_scout_config = os.path.join(venom_bringup_dir, 'config', 'ekf_scout.yaml')
 
     ekf_scout_node = Node(
@@ -135,7 +158,7 @@ def generate_launch_description():
         name='ekf_filter_node',
         output='screen',
         parameters=[ekf_scout_config],
-        condition=IfCondition(PythonExpression(["'", odom_source, "' == 'laser'"]))
+        condition=IfCondition(PythonExpression(["'", odom_source, "' == 'ekf'"]))
     )
 
     robot_description_launch = IncludeLaunchDescription(
@@ -159,7 +182,8 @@ def generate_launch_description():
         livox_driver_node,
         pointcloud_to_laserscan_node,
         scout_base_launch,
-        rf2o_node,
+        rf2o_laser_node,
+        rf2o_ekf_node,
         ekf_scout_node,
         robot_description_launch,
         rviz_node,
