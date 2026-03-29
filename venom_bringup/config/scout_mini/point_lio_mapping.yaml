@@ -4,9 +4,9 @@
         prop_at_freq_of_imu: True
         check_satu: True
         init_map_size: 10
-        point_filter_num: 4                                 # Options: 4, 3
+        point_filter_num: 2                                 # Options: 4, 3
         space_down_sample: True
-        filter_size_surf: 0.5                               # Options: 0.5, 0.3, 0.2, 0.15, 0.1
+        filter_size_surf: 0.2                               # Options: 0.5, 0.3, 0.2, 0.15, 0.1
         filter_size_map: 0.5                                # Options: 0.5, 0.3, 0.15, 0.1
         ivox_nearby_type: 6                                 # Options: 0, 6, 18, 26
         runtime_pos_log_enable: False                       # Option: True
@@ -70,5 +70,5 @@
             tf_send_en: True                                # publish odom -> base_link TF
 
         pcd_save:
-            pcd_save_en: True                               # save PCD for relocalization map
+            pcd_save_en: False                               # save PCD for relocalization map
             interval: -1
