@@ -47,11 +47,11 @@ def generate_launch_description():
             "to avoid conflict with Point-LIO odom->base_link"
         )
     )
-    # declare_nav2_params = DeclareLaunchArgument(
-    #     'nav2_params_file',
-    #     default_value=os.path.join(venom_bringup_dir, 'config', 'scout_mini', 'nav2_params.yaml'),
-    #     description='Path to nav2 parameters file'
-    # )
+    declare_nav2_params = DeclareLaunchArgument(
+        'nav2_params_file',
+        default_value=os.path.join(venom_bringup_dir, 'config', 'scout_mini', 'nav2_params.yaml'),
+        description='Path to nav2 parameters file'
+    )
 
     # ---------------------------------------------------------------------------
     # 1. Livox MID360 driver
@@ -174,15 +174,15 @@ def generate_launch_description():
     # ---------------------------------------------------------------------------
     # 6. Navigation stack
     # ---------------------------------------------------------------------------
-    # nav2_launch = IncludeLaunchDescription(
-    #     PythonLaunchDescriptionSource(
-    #         os.path.join(nav2_bringup_dir, 'launch', 'navigation_launch.py')
-    #     ),
-    #     launch_arguments={
-    #         'use_sim_time': 'false',
-    #         'params_file': nav2_params_file,
-    #     }.items()
-    # )
+    nav2_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(nav2_bringup_dir, 'launch', 'navigation_launch.py')
+        ),
+        launch_arguments={
+            'use_sim_time': 'false',
+            'params_file': nav2_params_file,
+        }.items()
+    )
 
     # ---------------------------------------------------------------------------
     # 7. RViz
@@ -199,13 +199,13 @@ def generate_launch_description():
     return LaunchDescription([
         declare_headless,
         declare_odom_source,
-        # declare_nav2_params,
+        declare_nav2_params,
         livox_driver_node,
         scout_base_launch,
         point_lio_node,
         pointcloud_to_laserscan_node,
         delayed_slam_toolbox,
         robot_description_launch,
-        # nav2_launch,
+        nav2_launch,
         rviz_node,
     ])
