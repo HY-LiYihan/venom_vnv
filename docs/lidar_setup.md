@@ -62,6 +62,10 @@ Mid360 默认地址通常为：
 
 配置完成后，WiFi 可以继续保持联网，用于 SSH、NoMachine 或其他网络访问。
 
+网络优先级示意：
+
+![网络优先级]({{ '/assets/network-priority.png' | relative_url }})
+
 ## 修改 MID360 配置文件
 
 打开：
@@ -89,6 +93,19 @@ Mid360 默认地址通常为：
 ~/venom_ws/install/livox_ros_driver2/share/livox_ros_driver2/config/MID360_config.json
 ```
 
+配置文件示意：
+
+![MID360 配置]({{ '/assets/mid360-config.png' | relative_url }})
+
+如果还需要同步检查 launch 文件中的相关配置，可参考：
+
+- `livox_ros_driver2/launch_ROS2/rviz_MID360.launch`
+- `livox_ros_driver2/launch_ROS2/msg_MID360.launch`
+
+对应示意：
+
+![Launch 配置]({{ '/assets/mid360-launch-config.png' | relative_url }})
+
 ## 雷达验证
 
 先测试网络是否连通：
@@ -104,17 +121,16 @@ ping 192.168.1.133
 ```bash
 cd ~/venom_ws
 source install/setup.bash
-ros2 launch livox_ros_driver2 msg_MID360_launch.py
+ros2 launch livox_ros_driver2 rviz_MID360_launch.py
 ```
 
-再开一个终端检查话题是否正常发布：
+启动前如需调整网络路由，可参考：
 
-```bash
-source ~/venom_ws/install/setup.bash
-ros2 topic list | grep livox
-```
+![路由示意]({{ '/assets/route-adjustment.png' | relative_url }})
 
-如果能看到 `/livox/lidar` 等相关话题，说明基础链路已经打通。
+## 下一步
+
+如果你还需要处理网络优先级、静态路由或开机自动执行这些命令，请继续阅读 [rc.local]({{ '/rc_local' | relative_url }}).
 
 ## 相关文档
 

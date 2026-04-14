@@ -19,6 +19,8 @@ Scout 系列底盘的 ROS2 控制接口，基于 ugv_sdk 实现 CAN 总线通信
 
 ### CAN 适配器配置
 
+更完整的部署步骤可参考：[底盘 CAN 部署](chassis_can_setup.md)
+
 ```bash
 # 加载内核模块
 sudo modprobe gs_usb

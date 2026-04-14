@@ -8,21 +8,17 @@ layout: default
 ## 快速导航
 
 <div class="card-grid">
-  <a href="{{ '/setup' | relative_url }}" class="card" style="text-decoration:none">
-    <h3>⚙️ 装配配置</h3>
-    <p>从零开始搭建开发环境，安装 SDK、编译工作空间、配置硬件。</p>
+  <a href="{{ '/quick_start' | relative_url }}" class="card" style="text-decoration:none">
+    <h3>⚙️ 快速开始</h3>
+    <p>按标准流程拉取仓库、安装依赖并完成首次编译。</p>
   </a>
-  <a href="{{ '/topics' | relative_url }}" class="card" style="text-decoration:none">
-    <h3>📡 话题参考</h3>
-    <p>系统级 ROS2 话题一览、数据流图、自定义消息字段。</p>
+  <a href="{{ '/environment' | relative_url }}" class="card" style="text-decoration:none">
+    <h3>🧰 环境配置</h3>
+    <p>准备 Ubuntu、SSH、ROS、rosdep、VS Code、Clash 与 NoMachine。</p>
   </a>
-  <a href="{{ '/rm_auto_aim' | relative_url }}" class="card" style="text-decoration:none">
-    <h3>🎯 自瞄算法</h3>
-    <p>装甲板检测 → EKF 跟踪 → 弹道解算 → 串口输出的完整流水线。</p>
-  </a>
-  <a href="{{ '/point_lio' | relative_url }}" class="card" style="text-decoration:none">
-    <h3>📍 定位建图</h3>
-    <p>Point-LIO 3D 里程计、rf2o 2D 里程计、small_gicp 重定位。</p>
+  <a href="{{ '/lidar_setup' | relative_url }}" class="card" style="text-decoration:none">
+    <h3>📡 配置雷达</h3>
+    <p>安装 Livox-SDK2、配置 MID360 网络参数并验证雷达链路。</p>
   </a>
 </div>
 
