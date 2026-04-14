@@ -28,4 +28,4 @@
 	branch = humble-devel
 [submodule "lio/Fast-LIO"]
 	path = lio/Fast-LIO
-	url = https://github.com/Venom-Algorithm/FAST_LIO_ROS2.git
+	url = https://github.com/Venom-Algorithm/Fast-LIO.git
