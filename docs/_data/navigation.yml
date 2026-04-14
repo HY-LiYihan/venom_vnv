@@ -10,6 +10,8 @@
       url: /
     - title: 快速开始
       url: /quick_start
+    - title: 启动使用
+      url: /launch_usage
 
 - category: 部署与使用
   items:
@@ -17,10 +19,10 @@
       url: /environment
     - title: 配置雷达
       url: /lidar_setup
-    - title: 装配配置
-      url: /setup
-    - title: 启动使用
-      url: /launch_usage
+    - title: 底盘 CAN 部署
+      url: /chassis_can_setup
+    - title: rc.local
+      url: /rc_local
     - title: 运行模式
       url: /run_modes
     - title: 话题与 TF 总览
