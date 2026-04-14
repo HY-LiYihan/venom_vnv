@@ -5,33 +5,6 @@ breadcrumb: 首页
 layout: default
 ---
 
-## 系统架构
-
-```
-┌─────────────────────────────────────────────────────┐
-│                   感知层 Perception                   │
-│         海康相机 (ros2_hik_camera)                    │
-│              ↓ /image_raw                            │
-│     装甲板检测 (armor_detector) → 目标跟踪 (armor_tracker) │
-│              ↓ /tracker/target                       │
-│     弹道解算 (auto_aim_solver) → /auto_aim            │
-├─────────────────────────────────────────────────────┤
-│                   定位层 Localization                 │
-│  Livox Mid360 (livox_ros_driver2)                    │
-│       ↓ /livox/lidar                                 │
-│  3D 里程计 (Point-LIO) ──→ 重定位 (small_gicp_reloc)  │
-│  2D 里程计 (rf2o_laser_odometry)                      │
-├─────────────────────────────────────────────────────┤
-│                   决策层 Decision                     │
-│  Mission Controller (venom_bringup)                   │
-│  状态监控 · 任务中断恢复 · 插件化行为                   │
-├─────────────────────────────────────────────────────┤
-│                   执行层 Actuation                    │
-│  串口通信 (venom_serial_driver) ←→ DJI C 板           │
-│  底盘驱动 (scout_ros2 + ugv_sdk) ←→ Scout Mini       │
-└─────────────────────────────────────────────────────┘
-```
-
 ## 快速导航
 
 <div class="card-grid">

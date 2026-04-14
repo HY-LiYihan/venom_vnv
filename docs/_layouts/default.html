@@ -74,6 +74,28 @@
     document.querySelector('.main-wrap')?.addEventListener('click', () => { document.getElementById('sidebar').classList.remove('open'); });
     window.addEventListener('scroll', () => { document.getElementById('backToTop').classList.toggle('visible', window.scrollY > 400); });
     document.addEventListener('keydown', e => { if (e.key === '/' && document.activeElement.tagName !== 'INPUT') { e.preventDefault(); document.getElementById('searchInput').focus(); } });
+    const navGroups = document.querySelectorAll('.nav-group');
+    const navStateKey = 'venom-docs-nav-groups';
+    let savedNavState = {};
+    try {
+      savedNavState = JSON.parse(localStorage.getItem(navStateKey) || '{}');
+    } catch (_) {
+      savedNavState = {};
+    }
+    navGroups.forEach(group => {
+      const groupName = group.dataset.group;
+      const active = group.querySelector('.nav-item.active');
+      if (groupName && Object.prototype.hasOwnProperty.call(savedNavState, groupName)) {
+        group.open = !!savedNavState[groupName];
+      } else if (active) {
+        group.open = true;
+      }
+      group.addEventListener('toggle', () => {
+        if (!groupName) return;
+        savedNavState[groupName] = group.open;
+        localStorage.setItem(navStateKey, JSON.stringify(savedNavState));
+      });
+    });
 
     // Auto-generate TOC from headings
     (function() {

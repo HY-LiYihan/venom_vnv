@@ -2,14 +2,37 @@
 {% assign nav_items = site.data.navigation %}
 
 {% for group in nav_items %}
-<div class="nav-category">{{ group.category }}</div>
+{% if group.category == "首页" %}
+  {% for item in group.items %}
+    {% assign item_url = item.url | relative_url %}
+    {% assign current_url = page.url | relative_url %}
+    {% if item_url == current_url %}
+    <a href="{{ item_url }}" class="nav-item nav-item-top active">{{ item.title }}</a>
+    {% else %}
+    <a href="{{ item_url }}" class="nav-item nav-item-top">{{ item.title }}</a>
+    {% endif %}
+  {% endfor %}
+{% else %}
+{% assign current_url = page.url | relative_url %}
+{% assign group_open = false %}
 {% for item in group.items %}
-  {% assign current_url = page.url | relative_url %}
   {% assign item_url = item.url | relative_url %}
   {% if item_url == current_url %}
-  <a href="{{ item_url }}" class="nav-item active">{{ item.title }}</a>
-  {% else %}
-  <a href="{{ item_url }}" class="nav-item">{{ item.title }}</a>
+    {% assign group_open = true %}
   {% endif %}
 {% endfor %}
+<details class="nav-group" data-group="{{ group.category }}" {% if group_open %}open{% endif %}>
+  <summary class="nav-category">{{ group.category }}</summary>
+  <div class="nav-group-items">
+  {% for item in group.items %}
+    {% assign item_url = item.url | relative_url %}
+    {% if item_url == current_url %}
+    <a href="{{ item_url }}" class="nav-item active">{{ item.title }}</a>
+    {% else %}
+    <a href="{{ item_url }}" class="nav-item">{{ item.title }}</a>
+    {% endif %}
+  {% endfor %}
+  </div>
+</details>
+{% endif %}
 {% endfor %}

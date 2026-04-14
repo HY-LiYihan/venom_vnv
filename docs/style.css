@@ -112,17 +112,37 @@ a:hover { color: var(--color-primary-dim); text-decoration: underline; }
 .sidebar::-webkit-scrollbar { width: 4px; }
 .sidebar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
+.nav-group { border-bottom: 1px solid rgba(30, 45, 61, 0.35); }
+.nav-group:last-child { border-bottom: none; }
 .nav-category {
-  padding: 0.5rem 1.2rem 0.3rem;
-  font-size: 0.7rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: 0.08em;
+  list-style: none;
+  padding: 0.65rem 1.2rem 0.45rem;
+  font-size: 0.9rem; font-weight: 700;
+  text-transform: none; letter-spacing: 0;
   color: var(--text-muted);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: space-between;
+  user-select: none;
 }
+.nav-category::-webkit-details-marker { display: none; }
+.nav-category::after {
+  content: "▾";
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+.nav-group:not([open]) .nav-category::after { transform: rotate(-90deg); }
+.nav-group-items { padding-bottom: 0.35rem; }
 .nav-item {
   display: block; padding: 0.35rem 1.2rem 0.35rem 1.5rem;
   font-size: 0.88rem; color: var(--text-secondary);
   border-left: 3px solid transparent;
   transition: all 0.15s;
+}
+.nav-item-top {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+  font-weight: 500;
 }
 .nav-item:hover {
   background: var(--bg-hover); color: var(--text);
@@ -132,6 +152,7 @@ a:hover { color: var(--color-primary-dim); text-decoration: underline; }
   color: var(--color-primary); background: var(--bg-active);
   border-left-color: var(--color-primary); font-weight: 500;
 }
+.nav-group[open] .nav-category { color: var(--text-secondary); }
 .nav-item-child {
   display: block; padding: 0.25rem 1.2rem 0.25rem 2.4rem;
   font-size: 0.82rem; color: var(--text-muted);
@@ -222,6 +243,17 @@ td {
   color: var(--text-secondary);
 }
 tr:hover td { background: var(--bg-hover); }
+
+/* ===== Images ===== */
+.main-content img {
+  display: block;
+  width: auto;
+  max-width: min(100%, 760px);
+  max-height: 70vh;
+  margin: 0.9rem auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
 
 /* ===== Callouts / Admonitions ===== */
 .callout {

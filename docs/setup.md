@@ -138,7 +138,7 @@ ping 192.168.1.103
 ip route
 ```
 
-![网络优先级](../assets/1752651964814.png)
+![网络优先级]({{ '/assets/1752651964814.png' | relative_url }})
 
 删除有线网络路由：
 
@@ -148,7 +148,7 @@ sudo ip route del 192.168.1.0/24 dev enp86s0
 
 所以此时再运行如下：
 
-![代码](../assets/image.png)
+![代码]({{ '/assets/image.png' | relative_url }})
 
 ### 6. 第六步：参数设置
 将雷达地址解析到有线连接，运行命令：
@@ -164,15 +164,15 @@ sudo ip route add 192.168.1.133 dev enp88s0 proto kernel scope link src 192.168.
 ```
 livox_ros_driver2/config/MID360_config.json
 ```
-![代码](../assets/1.png)
+![代码]({{ '/assets/1.png' | relative_url }})
 
 livox_ros_driver2/launch_ROS2/rviz_MID360.launch 
 
-![代码](../assets/2.png)
+![代码]({{ '/assets/2.png' | relative_url }})
 
 livox_ros_driver2/launch_ROS2/msg_MID360.launch
 
-![代码](../assets/2.png)
+![代码]({{ '/assets/2.png' | relative_url }})
 
 此时配置已经结束，可以尝试在工作空间跑以下指令：
 ```bash
