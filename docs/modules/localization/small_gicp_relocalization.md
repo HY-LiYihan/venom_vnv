@@ -39,11 +39,11 @@ layout: default
 
 当前常用启动入口：
 
-- [`small_gicp_relocalization_launch.py`](/Users/liyh/venom_vnv/relocalization/small_gicp_relocalization/launch/small_gicp_relocalization_launch.py)
+- [`small_gicp_relocalization_launch.py`](/Users/liyh/venom_vnv/localization/relocalization/small_gicp_relocalization/launch/small_gicp_relocalization_launch.py)
 
 核心参数在源码里声明：
 
-- [`small_gicp_relocalization.cpp`](/Users/liyh/venom_vnv/relocalization/small_gicp_relocalization/src/small_gicp_relocalization.cpp)
+- [`small_gicp_relocalization.cpp`](/Users/liyh/venom_vnv/localization/relocalization/small_gicp_relocalization/src/small_gicp_relocalization.cpp)
 
 ## 参数说明
 
@@ -99,4 +99,4 @@ ros2 launch small_gicp_relocalization small_gicp_relocalization_launch.py
 
 ## 进一步阅读
 
-- [small_gicp_relocalization README](../relocalization/small_gicp_relocalization/README.md)
+- [small_gicp_relocalization README](../../../localization/relocalization/small_gicp_relocalization/README.md)

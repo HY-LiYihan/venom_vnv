@@ -41,7 +41,7 @@ layout: default
 
 源码中的完整参数入口在：
 
-- [`tracker_node.cpp`](/Users/liyh/venom_vnv/rm_auto_aim/armor_tracker/src/tracker_node.cpp)
+- [`tracker_node.cpp`](/Users/liyh/venom_vnv/perception/rm_auto_aim/armor_tracker/src/tracker_node.cpp)
 
 下面表格中的“默认值”指源码默认值。实战启动时如果 `node_params.yaml` 里做了覆盖，应以 bringup 传入的值为准。
 
@@ -100,4 +100,4 @@ ros2 run armor_tracker armor_tracker_node
 
 ## 进一步阅读
 
-- [armor_tracker README](../rm_auto_aim/armor_tracker/README.md)
+- [armor_tracker README](../../../perception/rm_auto_aim/armor_tracker/README.md)

@@ -2,7 +2,7 @@
 
 Date: 2026-04-16
 Workspace: `/Users/liyh/venom_vnv`
-Primary package: `/Users/liyh/venom_vnv/lio/Point-LIO`
+Primary package: `/Users/liyh/venom_vnv/localization/lio/Point-LIO`
 Primary bringup: `/Users/liyh/venom_vnv/venom_bringup`
 
 ## User Goal
@@ -14,7 +14,7 @@ The user wants to investigate and improve Point-LIO performance, especially drif
 - Current Point-LIO remote setup:
   - `origin`: `git@github.com:Venom-Algorithm/Point-LIO.git`
   - `upstream`: `https://github.com/hku-mars/Point-LIO.git`
-- Current checked-out commit in `lio/Point-LIO` during this work:
+- Current checked-out commit in `localization/lio/Point-LIO` during this work:
   - `568f60c6179cdb1455ea3739bf7de76147466fbc`
 - HKU upstream comparison target used:
   - `upstream/point-lio-with-grid-map`
@@ -22,7 +22,7 @@ The user wants to investigate and improve Point-LIO performance, especially drif
 ## What Was Read / Analyzed
 
 - Top-level project architecture and docs were read.
-- Entire `lio/Point-LIO` tree was read, including:
+- Entire `localization/lio/Point-LIO` tree was read, including:
   - `src/*`
   - `config/*`
   - `launch/*`
@@ -44,7 +44,7 @@ The bringup YAML already had:
 
 The package also read this parameter in:
 
-- `/Users/liyh/venom_vnv/lio/Point-LIO/src/parameters.cpp`
+- `/Users/liyh/venom_vnv/localization/lio/Point-LIO/src/parameters.cpp`
 
 But before this session it was not effectively connected into the IMU timestamp correction path for the current branch.
 
@@ -76,7 +76,7 @@ This is especially suspicious under high dynamic motion because it can manifest 
 ### A. Fixed vector sizing bug
 
 File:
-- `/Users/liyh/venom_vnv/lio/Point-LIO/src/laserMapping.cpp`
+- `/Users/liyh/venom_vnv/localization/lio/Point-LIO/src/laserMapping.cpp`
 
 Change:
 - Replaced:
@@ -89,24 +89,24 @@ Change:
 ### B. Wired fixed LiDAR->IMU time offset into IMU callback
 
 File:
-- `/Users/liyh/venom_vnv/lio/Point-LIO/src/li_initialization.cpp`
+- `/Users/liyh/venom_vnv/localization/lio/Point-LIO/src/li_initialization.cpp`
 
 Change:
 - IMU timestamp correction now subtracts `time_diff_lidar_to_imu` in `imu_cbk()`
 
 Current relevant line area:
-- `/Users/liyh/venom_vnv/lio/Point-LIO/src/li_initialization.cpp:160`
+- `/Users/liyh/venom_vnv/localization/lio/Point-LIO/src/li_initialization.cpp:160`
 
 ### C. Added startup log for configured fixed time offset
 
 File:
-- `/Users/liyh/venom_vnv/lio/Point-LIO/src/parameters.cpp`
+- `/Users/liyh/venom_vnv/localization/lio/Point-LIO/src/parameters.cpp`
 
 Change:
 - Added startup log showing the active fixed LiDAR->IMU offset
 
 Current relevant line area:
-- `/Users/liyh/venom_vnv/lio/Point-LIO/src/parameters.cpp:303`
+- `/Users/liyh/venom_vnv/localization/lio/Point-LIO/src/parameters.cpp:303`
 
 ## Bringup / Recording Changes Already Made
 
@@ -231,8 +231,7 @@ Recommended immediate work items:
 - `/Users/liyh/venom_vnv/venom_bringup/launch/examples/mid360_point_lio.launch.py`
 - `/Users/liyh/venom_vnv/venom_bringup/launch/examples/mid360_record_raw.launch.py`
 - `/Users/liyh/venom_vnv/venom_bringup/config/examples/point_lio_mapping.yaml`
-- `/Users/liyh/venom_vnv/lio/Point-LIO/src/laserMapping.cpp`
-- `/Users/liyh/venom_vnv/lio/Point-LIO/src/li_initialization.cpp`
-- `/Users/liyh/venom_vnv/lio/Point-LIO/src/parameters.cpp`
-- `/Users/liyh/venom_vnv/lio/Point-LIO/src/IMU_Processing.cpp`
-
+- `/Users/liyh/venom_vnv/localization/lio/Point-LIO/src/laserMapping.cpp`
+- `/Users/liyh/venom_vnv/localization/lio/Point-LIO/src/li_initialization.cpp`
+- `/Users/liyh/venom_vnv/localization/lio/Point-LIO/src/parameters.cpp`
+- `/Users/liyh/venom_vnv/localization/lio/Point-LIO/src/IMU_Processing.cpp`

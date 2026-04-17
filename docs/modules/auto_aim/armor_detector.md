@@ -38,7 +38,7 @@ layout: default
 
 当前默认参数文件：
 
-- [armor_detector.yaml](/Users/liyh/venom_vnv/rm_auto_aim/armor_detector/config/armor_detector.yaml)
+- [armor_detector.yaml](/Users/liyh/venom_vnv/perception/rm_auto_aim/armor_detector/config/armor_detector.yaml)
 
 实战常用覆盖入口：
 
@@ -111,4 +111,4 @@ ros2 launch armor_detector armor_detector.launch.py
 
 ## 进一步阅读
 
-- [armor_detector README](../rm_auto_aim/armor_detector/README.md)
+- [armor_detector README](../../../perception/rm_auto_aim/armor_detector/README.md)

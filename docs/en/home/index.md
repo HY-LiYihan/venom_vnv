@@ -89,15 +89,15 @@ The repository includes both built-in packages and external submodules. For a qu
     <tr><td>Drivers</td><td><code>driver/hunter_ros2</code></td><td>ROS 2 wrapper for Hunter platforms</td></tr>
     <tr><td>Drivers</td><td><code>driver/ugv_sdk</code></td><td>Low-level C++ SDK and CAN tools for AgileX / Weston Robot platforms</td></tr>
     <tr><td>Drivers</td><td><code>driver/piper_ros</code></td><td>Piper arm ROS 2 control, description, MoveIt, and simulation packages</td></tr>
-    <tr><td>Localization</td><td><code>lio/Point-LIO</code></td><td>High-bandwidth LiDAR-inertial odometry, tuned for MID360 workflows</td></tr>
-    <tr><td>Localization</td><td><code>lio/Fast-LIO</code></td><td>ROS 2 version of FAST-LIO</td></tr>
-    <tr><td>Localization</td><td><code>lio/rf2o_laser_odometry</code></td><td>2D laser odometry based on range flow</td></tr>
-    <tr><td>Relocalization</td><td><code>relocalization/small_gicp_relocalization</code></td><td>Point-cloud relocalization based on small_gicp</td></tr>
-    <tr><td>Auto Aim</td><td><code>rm_auto_aim</code></td><td>Auto aim stack including detection, tracking, solving, and interface definitions</td></tr>
-    <tr><td>Auto Aim</td><td><code>rm_auto_aim/armor_detector</code></td><td>Armor detection module</td></tr>
-    <tr><td>Auto Aim</td><td><code>rm_auto_aim/armor_tracker</code></td><td>Target tracking module</td></tr>
-    <tr><td>Auto Aim</td><td><code>rm_auto_aim/auto_aim_solver</code></td><td>Ballistics and target solving module</td></tr>
-    <tr><td>Auto Aim</td><td><code>rm_auto_aim/auto_aim_interfaces</code></td><td>Message and interface definitions for the auto aim pipeline</td></tr>
+    <tr><td>Perception</td><td><code>perception/rm_auto_aim</code></td><td>Auto aim stack including detection, tracking, solving, and interface definitions</td></tr>
+    <tr><td>Perception</td><td><code>perception/rm_auto_aim/armor_detector</code></td><td>Armor detection module</td></tr>
+    <tr><td>Perception</td><td><code>perception/rm_auto_aim/armor_tracker</code></td><td>Target tracking module</td></tr>
+    <tr><td>Perception</td><td><code>perception/rm_auto_aim/auto_aim_solver</code></td><td>Ballistics and target solving module</td></tr>
+    <tr><td>Perception</td><td><code>perception/rm_auto_aim/auto_aim_interfaces</code></td><td>Message and interface definitions for the auto aim pipeline</td></tr>
+    <tr><td>Localization</td><td><code>localization/lio/Point-LIO</code></td><td>High-bandwidth LiDAR-inertial odometry, tuned for MID360 workflows</td></tr>
+    <tr><td>Localization</td><td><code>localization/lio/Fast-LIO</code></td><td>ROS 2 version of FAST-LIO</td></tr>
+    <tr><td>Localization</td><td><code>localization/lio/rf2o_laser_odometry</code></td><td>2D laser odometry based on range flow</td></tr>
+    <tr><td>Localization</td><td><code>localization/relocalization/small_gicp_relocalization</code></td><td>Point-cloud relocalization based on small_gicp</td></tr>
     <tr><td>Integration</td><td><code>venom_bringup</code></td><td>Main bringup entry with example, infantry, sentry, scout_mini, and hunter_se configs</td></tr>
     <tr><td>Integration</td><td><code>venom_robot_description</code></td><td>Robot model, URDF, and TF description package</td></tr>
   </tbody>

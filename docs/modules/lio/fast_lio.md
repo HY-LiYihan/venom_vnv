@@ -8,7 +8,7 @@ layout: default
 
 # Fast-LIO
 
-当前仓库已经将 `Fast-LIO` 接入为 `lio/Fast-LIO` 子模块。
+当前仓库已经将 `Fast-LIO` 接入为 `localization/lio/Fast-LIO` 子模块。
 
 ## 模块定位
 
@@ -46,7 +46,7 @@ layout: default
 
 ## 当前使用的配置文件
 
-- 子模块配置：[mid360.yaml](/Users/liyh/venom_vnv/lio/Fast-LIO/config/mid360.yaml)
+- 子模块配置：[mid360.yaml](/Users/liyh/venom_vnv/localization/lio/Fast-LIO/config/mid360.yaml)
 
 ## 参数说明
 
