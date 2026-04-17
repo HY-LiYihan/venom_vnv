@@ -21,8 +21,8 @@ layout: default
 
 ## 当前使用的配置文件
 
-- 子模块配置：[mid360.yaml](/Users/liyh/venom_vnv/lio/Point-LIO/config/mid360.yaml)
-- 建图配置：[mid360_mapping.yaml](/Users/liyh/venom_vnv/lio/Point-LIO/config/mid360_mapping.yaml)
+- 子模块配置：[mid360.yaml](/Users/liyh/venom_vnv/localization/lio/Point-LIO/config/mid360.yaml)
+- 建图配置：[mid360_mapping.yaml](/Users/liyh/venom_vnv/localization/lio/Point-LIO/config/mid360_mapping.yaml)
 
 ## 参数说明
 

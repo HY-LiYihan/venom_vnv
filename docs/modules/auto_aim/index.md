@@ -30,9 +30,9 @@ layout: default
 
 这套链路里的参数分散在几个地方：
 
-- 检测器参数：[armor_detector.yaml](/Users/liyh/venom_vnv/rm_auto_aim/armor_detector/config/armor_detector.yaml)
+- 检测器参数：[armor_detector.yaml](/Users/liyh/venom_vnv/perception/rm_auto_aim/armor_detector/config/armor_detector.yaml)
 - 实战配置入口：[node_params.yaml](/Users/liyh/venom_vnv/venom_bringup/config/infantry/node_params.yaml)
-- 弹道解算节点参数：[`solver_node.py`](/Users/liyh/venom_vnv/rm_auto_aim/auto_aim_solver/auto_aim_solver/solver_node.py)
+- 弹道解算节点参数：[`solver_node.py`](/Users/liyh/venom_vnv/perception/rm_auto_aim/auto_aim_solver/auto_aim_solver/solver_node.py)
 
 ## 数据流
 
@@ -133,5 +133,5 @@ ros2 launch venom_bringup autoaim_nav_bringup.launch.py
 
 ## 进一步阅读
 
-- [armor_detector README](../rm_auto_aim/armor_detector/README.md)
-- [armor_tracker README](../rm_auto_aim/armor_tracker/README.md)
+- [armor_detector README](../../../perception/rm_auto_aim/armor_detector/README.md)
+- [armor_tracker README](../../../perception/rm_auto_aim/armor_tracker/README.md)

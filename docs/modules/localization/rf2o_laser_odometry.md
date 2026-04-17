@@ -31,7 +31,7 @@ layout: default
 
 当前仓库里最直接的启动入口是：
 
-- [`rf2o_laser_odometry.launch.py`](/Users/liyh/venom_vnv/lio/rf2o_laser_odometry/launch/rf2o_laser_odometry.launch.py)
+- [`rf2o_laser_odometry.launch.py`](/Users/liyh/venom_vnv/localization/lio/rf2o_laser_odometry/launch/rf2o_laser_odometry.launch.py)
 
 这个 launch 里已经直接写入了常用运行参数。
 
@@ -73,4 +73,4 @@ ros2 launch rf2o_laser_odometry rf2o_laser_odometry.launch.py
 
 ## 进一步阅读
 
-- [rf2o_laser_odometry README](../lio/rf2o_laser_odometry/README.md)
+- [rf2o_laser_odometry README](../../../localization/lio/rf2o_laser_odometry/README.md)

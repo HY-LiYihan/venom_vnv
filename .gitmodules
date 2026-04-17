@@ -1,11 +1,11 @@
 [submodule "driver/livox_ros_driver2"]
 	path = driver/livox_ros_driver2
 	url = https://github.com/Livox-SDK/livox_ros_driver2
-[submodule "lio/Point-LIO"]
-	path = lio/Point-LIO
+[submodule "localization/lio/Point-LIO"]
+	path = localization/lio/Point-LIO
 	url = https://github.com/Venom-Algorithm/Point-LIO.git
-[submodule "relocalization/small_gicp_relocalization"]
-	path = relocalization/small_gicp_relocalization
+[submodule "localization/relocalization/small_gicp_relocalization"]
+	path = localization/relocalization/small_gicp_relocalization
 	url = https://github.com/Venom-Algorithm/small_gicp_relocalization.git
 [submodule "driver/ugv_sdk"]
 	path = driver/ugv_sdk
@@ -13,8 +13,8 @@
 [submodule "driver/scout_ros2"]
 	path = driver/scout_ros2
 	url = https://github.com/agilexrobotics/scout_ros2
-[submodule "rm_auto_aim"]
-	path = rm_auto_aim
+[submodule "perception/rm_auto_aim"]
+	path = perception/rm_auto_aim
 	url = https://github.com/Venom-Algorithm/rm_auto_aim.git
 [submodule "driver/ros2_hik_camera"]
 	path = driver/ros2_hik_camera
@@ -22,12 +22,12 @@
 [submodule "driver/venom_serial_driver"]
 	path = driver/venom_serial_driver
 	url = https://github.com/Venom-Algorithm/venom_serial_driver.git
-[submodule "lio/rf2o_laser_odometry"]
-	path = lio/rf2o_laser_odometry
+[submodule "localization/lio/rf2o_laser_odometry"]
+	path = localization/lio/rf2o_laser_odometry
 	url = https://github.com/Venom-Algorithm/rf2o_laser_odometry.git
 	branch = humble-devel
-[submodule "lio/Fast-LIO"]
-	path = lio/Fast-LIO
+[submodule "localization/lio/Fast-LIO"]
+	path = localization/lio/Fast-LIO
 	url = https://github.com/Venom-Algorithm/Fast-LIO.git
 [submodule "driver/piper_ros"]
 	path = driver/piper_ros
@@ -40,7 +40,6 @@
 [submodule "driver/venom_px4_bridge"]
 	path = driver/venom_px4_bridge
 	url = https://github.com/Venom-Algorithm/venom_px4_bridge.git
-
 [submodule "simulation/venom_nav_simulation"]
 	path = simulation/venom_nav_simulation
 	url = git@github.com:Venom-Algorithm/venom_nav_simulation.git
