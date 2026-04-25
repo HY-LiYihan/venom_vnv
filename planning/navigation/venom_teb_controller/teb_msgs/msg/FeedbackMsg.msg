@@ -9,7 +9,7 @@ teb_msgs/TrajectoryMsg[] trajectories
 # Index of the trajectory in 'trajectories' that is selected currently
 uint16 selected_trajectory_idx
 
-# List of active obstacles
-costmap_converter_msgs/ObstacleArrayMsg obstacles_msg
+
+
 
 

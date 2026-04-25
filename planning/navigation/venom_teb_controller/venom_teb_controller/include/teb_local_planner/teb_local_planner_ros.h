@@ -58,14 +58,14 @@
 #include <geometry_msgs/msg/pose_stamped.hpp>
 #include <visualization_msgs/msg/marker_array.hpp>
 #include <visualization_msgs/msg/marker.hpp>
-#include <costmap_converter_msgs/msg/obstacle_msg.hpp>
+//#include <costmap_converter_msgs/msg/obstacle_msg.hpp>
 
 // transforms
 #include <tf2_ros/transform_listener.h>
 #include <tf2/transform_datatypes.h>
 
 // costmap
-#include <costmap_converter/costmap_converter_interface.h>
+//#include <costmap_converter/costmap_converter_interface.h>
 #include "nav2_costmap_2d/costmap_filters/filter_values.hpp"
 
 #include <nav2_util/lifecycle_node.hpp>
@@ -205,22 +205,7 @@ protected:
    * @remarks All previous obstacles are cleared.
    * @sa updateObstacleContainerWithCostmap
    */
-  void updateObstacleContainerWithCostmapConverter();
   
-  /**
-   * @brief Update internal obstacle vector based on custom messages received via subscriber
-   * @remarks All previous obstacles are NOT cleared. Call this method after other update methods.
-   * @sa updateObstacleContainerWithCostmap, updateObstacleContainerWithCostmapConverter
-   */
-  void updateObstacleContainerWithCustomObstacles();
-
-
-  /**
-   * @brief Update internal via-point container based on the current reference plan
-   * @remarks All previous via-points will be cleared.
-   * @param transformed_plan (local) portion of the global plan (which is already transformed to the planning frame)
-   * @param min_separation minimum separation between two consecutive via-points
-   */
   void updateViaPointsContainer(const std::vector<geometry_msgs::msg::PoseStamped>& transformed_plan, double min_separation);
   
   
@@ -239,7 +224,7 @@ protected:
     * @brief Callback for custom obstacles that are not obtained from the costmap 
     * @param obst_msg pointer to the message containing a list of polygon shaped obstacles
     */
-  void customObstacleCB(const costmap_converter_msgs::msg::ObstacleArrayMsg::ConstSharedPtr obst_msg);
+  
   
    /**
     * @brief Callback for custom via-points
@@ -383,13 +368,12 @@ private:
   
   std::vector<geometry_msgs::msg::PoseStamped> global_plan_; //!< Store the current global plan
   
-  pluginlib::ClassLoader<costmap_converter::BaseCostmapToPolygons> costmap_converter_loader_; //!< Load costmap converter plugins at runtime
-  std::shared_ptr<costmap_converter::BaseCostmapToPolygons> costmap_converter_; //!< Store the current costmap_converter  
+ 
 
   //std::shared_ptr< dynamic_reconfigure::Server<TebLocalPlannerReconfigureConfig> > dynamic_recfg_; //!< Dynamic reconfigure server to allow config modifications at runtime
-  rclcpp::Subscription<costmap_converter_msgs::msg::ObstacleArrayMsg>::SharedPtr custom_obst_sub_; //!< Subscriber for custom obstacles received via a ObstacleMsg.
+   
   std::mutex custom_obst_mutex_; //!< Mutex that locks the obstacle array (multi-threaded)
-  costmap_converter_msgs::msg::ObstacleArrayMsg custom_obstacle_msg_; //!< Copy of the most recent obstacle message
+  
 
   rclcpp::Subscription<nav_msgs::msg::Path>::SharedPtr via_points_sub_; //!< Subscriber for custom via-points received via a Path msg.
   bool custom_via_points_active_; //!< Keep track whether valid via-points have been received from via_points_sub_
