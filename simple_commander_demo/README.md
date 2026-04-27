@@ -21,6 +21,68 @@
 
 如果未来想把 mission 输入进一步泛化为“语义地图 + 任务目标 + 约束”，并动态生成 waypoint/task 绑定，可参考 `docs/FUTURE_DYNAMIC_MISSION_BRANCH.md`。
 
+面向 AI 协作和代码解释的回答偏好文档见 `docs/AI_USER_PREFERENCE_GUIDE.md`。
+
+## 工作流程概览
+
+`simple_commander_demo` 的主流程可以理解成一条固定执行链：
+
+```text
+launch / ros2 run
+→ 启动 SimpleCommander 这个 ROS 2 node
+→ 读取 mission YAML
+→ 解析成 MissionConfig / WaypointSpec / TaskSpec
+→ 初始化导航器和任务插件
+→ 按顺序处理每个 waypoint
+  → 导航到目标点，或按 skip_navigation 跳过导航
+  → 到点后按顺序执行该 waypoint 下的 tasks
+  → 每个 task 通过 type 找到对应 TaskPlugin
+  → 插件执行后返回 TaskExecutionResult
+  → 任务结果写入 MissionManager 和 blackboard
+→ 所有 waypoint 完成后 mission 进入 COMPLETED / FAILED
+```
+
+运行时只有 `SimpleCommander` 是真正的 ROS 2 node。`WaypointSpec`、`TaskSpec`、`MissionConfig` 都只是 Python 数据对象，用来承载 YAML 解析后的任务描述。任务插件默认也是普通 Python 对象，但它们可以通过 `TaskContext.node` 借用 `SimpleCommander` 去创建 ROS service/action/topic client。
+
+## 模块职责
+
+- `SimpleCommander`：总控节点，负责读取参数、加载 mission、创建导航器、注册任务插件，并按路点驱动完整流程。
+- `MissionLoader`：把 YAML 里的 `mission`、`waypoints`、`tasks` 解析成 Python 数据结构。
+- `WaypointNavigator`：导航适配层；mock 模式只打印并等待，Nav2 模式会把 `WaypointSpec` 转成 `PoseStamped` 后调用 `BasicNavigator.goToPose()`。
+- `WaypointTaskRunner`：任务调度器；到达路点后按顺序执行当前路点的 task 列表。
+- `TaskPluginRegistry`：任务插件表；根据 YAML 里的 `type` 找到对应插件。
+- `BaseTaskPlugin`：任务插件统一接口；后续接真实视觉、机械臂、语音时主要扩展这里。
+- `MissionManager`：轻量任务状态机和状态记录器；记录当前路点、当前任务、最近结果、失败原因和状态切换历史。
+
+## 数据流和插件协作
+
+一个 task 的输入主要来自两处：
+
+- YAML 参数：除 `name` 和 `type` 外的字段都会进入 `TaskSpec.params`，例如 `target`、`source`、`timeout_sec`、`place_zone`。
+- `blackboard`：任务之间共享的运行时数据，例如识别结果、夹取结果、电表读数。
+
+插件执行后也有两类输出：
+
+- `TaskExecutionResult`：告诉 `WaypointTaskRunner` 当前任务是否成功、日志消息是什么、结果数据是什么。
+- `context.blackboard`：把结果留给后续任务使用，例如 `detect_item` 写入 `detected_item`，`grasp_item` 再读取它。
+
+典型任务链如下：
+
+```text
+detect_item
+→ 写 blackboard["detected_item"]
+
+grasp_item
+→ 读 blackboard["detected_item"]
+→ 写 blackboard["grasped_object"]
+
+classify_place
+→ 读 blackboard["grasped_object"]
+→ 写 blackboard["last_placement"]
+```
+
+`MissionManager` 不直接执行任务，它只记录状态。任务开始时 `WaypointTaskRunner` 会调用 `mark_task_started()`，任务失败时调用 `mark_task_failed()`，如果配置了 `stop_on_task_failure: true`，则进一步调用 `fail()` 把 mission 切到 `FAILED`。
+
 ## 主要接口
 
 - `SimpleCommander.configure()`：读取 YAML、注册任务插件、创建导航器、初始化任务状态。
