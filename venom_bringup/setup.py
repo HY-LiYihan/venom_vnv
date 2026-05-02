@@ -64,6 +64,8 @@ setup(
             'venom_bringup.multi_waypoint_commander:main',
             'simple_waypoint_commander = '
             'venom_bringup.simple_waypoint_commander:main',
+            'road_network_to_waypoints = '
+            'venom_bringup.road_network_to_waypoints:main',
             'simple_commander = '
             'venom_bringup.simple_commander:main',
             'craic_mission_main = '

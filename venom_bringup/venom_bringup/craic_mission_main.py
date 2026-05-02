@@ -14,6 +14,10 @@ from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from rcl_interfaces.msg import ParameterDescriptor
 
 from venom_bringup.craic_waypoint_utils import CraicWaypoint, load_craic_waypoints
+from venom_bringup.road_network_waypoint_utils import (
+    load_planned_road_route,
+    route_to_craic_waypoints,
+)
 
 
 def distance_xy(x1: float, y1: float, x2: float, y2: float) -> float:
@@ -29,16 +33,42 @@ class CraicMissionCommander(BasicNavigator):
         self._declare_parameters()
         self._load_parameters()
 
-        self._waypoints: List[CraicWaypoint] = load_craic_waypoints(
-            file_path=self.waypoint_file,
-            coordinate_mode=self.coordinate_mode,
-            origin_longitude_deg=self.map_origin_longitude_deg,
-            origin_latitude_deg=self.map_origin_latitude_deg,
-            map_origin_yaw_rad=self.map_origin_yaw_rad,
-            map_origin_x_m=self.map_origin_x_m,
-            map_origin_y_m=self.map_origin_y_m,
-            use_first_waypoint_as_origin=self.use_first_waypoint_as_origin,
-        )
+        self._route_node_ids: List[str] = []
+        self._planned_route_name: Optional[str] = None
+        if self.road_network_file:
+            planned_route = load_planned_road_route(
+                file_path=self.road_network_file,
+                route_name=self.route_name or None,
+                route_nodes=self.route_nodes or None,
+                default_frame_id=self.waypoint_frame_id,
+                coordinate_mode=self.coordinate_mode,
+                map_origin_longitude_deg=self.map_origin_longitude_deg,
+                map_origin_latitude_deg=self.map_origin_latitude_deg,
+                map_origin_yaw_rad=self.map_origin_yaw_rad,
+                map_origin_x_m=self.map_origin_x_m,
+                map_origin_y_m=self.map_origin_y_m,
+                start_node_id=self.start_node_id or None,
+                goal_node_id=self.goal_node_id or None,
+                start_x_m=self.start_x_m,
+                start_y_m=self.start_y_m,
+                goal_x_m=self.goal_x_m,
+                goal_y_m=self.goal_y_m,
+                blocked_edges=self.blocked_edges or None,
+            )
+            self._waypoints = route_to_craic_waypoints(planned_route)
+            self._route_node_ids = planned_route.route_node_ids
+            self._planned_route_name = planned_route.route_name
+        else:
+            self._waypoints = load_craic_waypoints(
+                file_path=self.waypoint_file,
+                coordinate_mode=self.coordinate_mode,
+                origin_longitude_deg=self.map_origin_longitude_deg,
+                origin_latitude_deg=self.map_origin_latitude_deg,
+                map_origin_yaw_rad=self.map_origin_yaw_rad,
+                map_origin_x_m=self.map_origin_x_m,
+                map_origin_y_m=self.map_origin_y_m,
+                use_first_waypoint_as_origin=self.use_first_waypoint_as_origin,
+            )
         self._goal_poses = [self._to_pose_stamped(waypoint) for waypoint in self._waypoints]
 
         self._cmd_vel_pub = self.create_publisher(Twist, self.cmd_vel_topic, 10)
@@ -74,6 +104,17 @@ class CraicMissionCommander(BasicNavigator):
         self.declare_parameter('map_origin_y_m', 0.0)
         self.declare_parameter('map_origin_yaw_rad', 0.0)
         self.declare_parameter('use_first_waypoint_as_origin', True)
+        self.declare_parameter('road_network_file', '')
+        self.declare_parameter('route_name', '')
+        self.declare_parameter('route_nodes', '')
+        self.declare_parameter('start_node_id', '')
+        self.declare_parameter('goal_node_id', '')
+        self.declare_parameter('start_x_m', 0.0)
+        self.declare_parameter('start_y_m', 0.0)
+        self.declare_parameter('goal_x_m', 0.0)
+        self.declare_parameter('goal_y_m', 0.0)
+        self.declare_parameter('use_start_goal_xy', False)
+        self.declare_parameter('blocked_edges', '')
         self.declare_parameter('waypoint_frame_id', 'map')
         self.declare_parameter('pose_tracking_topic', '/odometry/global')
         self.declare_parameter('cmd_vel_topic', '/cmd_vel')
@@ -98,6 +139,17 @@ class CraicMissionCommander(BasicNavigator):
         self.use_first_waypoint_as_origin = bool(
             self.get_parameter('use_first_waypoint_as_origin').value
         )
+        self.road_network_file = self.get_parameter('road_network_file').value
+        self.route_name = self.get_parameter('route_name').value
+        self.route_nodes = self.get_parameter('route_nodes').value
+        self.start_node_id = self.get_parameter('start_node_id').value
+        self.goal_node_id = self.get_parameter('goal_node_id').value
+        self.use_start_goal_xy = bool(self.get_parameter('use_start_goal_xy').value)
+        self.start_x_m = float(self.get_parameter('start_x_m').value) if self.use_start_goal_xy else None
+        self.start_y_m = float(self.get_parameter('start_y_m').value) if self.use_start_goal_xy else None
+        self.goal_x_m = float(self.get_parameter('goal_x_m').value) if self.use_start_goal_xy else None
+        self.goal_y_m = float(self.get_parameter('goal_y_m').value) if self.use_start_goal_xy else None
+        self.blocked_edges = self.get_parameter('blocked_edges').value
         self.waypoint_frame_id = self.get_parameter('waypoint_frame_id').value
         self.pose_tracking_topic = self.get_parameter('pose_tracking_topic').value
         self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
@@ -269,9 +321,20 @@ class CraicMissionCommander(BasicNavigator):
         return (time.monotonic() - self._last_progress_time) >= self.stuck_timeout_sec
 
     def run(self) -> int:
-        self.get_logger().info(
-            f'Loaded {len(self._waypoints)} CRAIC waypoint(s) from {self.waypoint_file}'
-        )
+        if self.road_network_file:
+            self.get_logger().info(
+                f'Planned {len(self._waypoints)} waypoint(s) from road network {self.road_network_file}'
+            )
+            if self._planned_route_name:
+                self.get_logger().info(f'Planned route: {self._planned_route_name}')
+            if self._route_node_ids:
+                self.get_logger().info(
+                    f'Route node sequence: {" -> ".join(self._route_node_ids)}'
+                )
+        else:
+            self.get_logger().info(
+                f'Loaded {len(self._waypoints)} CRAIC waypoint(s) from {self.waypoint_file}'
+            )
         self._wait_for_bt_navigator()
 
         if not self._send_remaining_waypoints(0):

@@ -1,0 +1,46 @@
+# Example road network for competition-style route planning.
+#
+# This format separates:
+# 1. node definitions
+# 2. traversable edges
+# 3. optional named routes
+#
+# Each node may carry a default action/attr value used when exported to
+# competition waypoint.txt:
+#   0 unknown, 1 straight, 2 right, 3 left, 4 lane_change_left,
+#   5 lane_change_right, 6 overtake, 7 u_turn, 8 park.
+
+coordinate_mode: cartesian_cm
+
+nodes:
+  start:
+    x: 0
+    y: 0
+    attr: 1
+  mid_a:
+    x: 400
+    y: 0
+    attr: 1
+  mid_b:
+    x: 400
+    y: 300
+    attr: 3
+  goal:
+    x: 800
+    y: 300
+    attr: 8
+
+edges:
+  - from: start
+    to: mid_a
+  - from: mid_a
+    to: mid_b
+  - from: mid_b
+    to: goal
+
+routes:
+  demo_patrol:
+    - start
+    - mid_a
+    - mid_b
+    - goal

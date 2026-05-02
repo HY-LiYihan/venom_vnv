@@ -25,6 +25,8 @@ from geometry_msgs.msg import PoseStamped
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from rcl_interfaces.msg import ParameterDescriptor
 
+from venom_bringup.road_network_waypoint_utils import load_route_waypoints
+
 
 # ---------------------------------------------------------------------------
 # YAML loading
@@ -131,8 +133,112 @@ def main() -> None:
             description='Absolute path to the waypoints YAML file.'
         ),
     )
+    navigator.declare_parameter(
+        'road_network_file',
+        '',
+        ParameterDescriptor(
+            description='Absolute path to a road-network YAML file.'
+        ),
+    )
+    navigator.declare_parameter(
+        'route_name',
+        '',
+        ParameterDescriptor(
+            description='Named route to extract from the road-network file.'
+        ),
+    )
+    navigator.declare_parameter(
+        'route_nodes',
+        '',
+        ParameterDescriptor(
+            description='Explicit route node list, for example "A,B,C".'
+        ),
+    )
+    navigator.declare_parameter(
+        'route_frame_id',
+        'map',
+        ParameterDescriptor(
+            description='Fallback frame_id for road-network route entries.'
+        ),
+    )
+    navigator.declare_parameter(
+        'coordinate_mode',
+        'auto',
+        ParameterDescriptor(
+            description='Road-network coordinate mode: auto, geodetic, cartesian_m, or cartesian_cm.'
+        ),
+    )
+    navigator.declare_parameter('map_origin_longitude_deg', 0.0)
+    navigator.declare_parameter('map_origin_latitude_deg', 0.0)
+    navigator.declare_parameter('map_origin_x_m', 0.0)
+    navigator.declare_parameter('map_origin_y_m', 0.0)
+    navigator.declare_parameter('map_origin_yaw_rad', 0.0)
+    navigator.declare_parameter('start_node_id', '')
+    navigator.declare_parameter('goal_node_id', '')
+    navigator.declare_parameter('start_x_m', 0.0)
+    navigator.declare_parameter('start_y_m', 0.0)
+    navigator.declare_parameter('goal_x_m', 0.0)
+    navigator.declare_parameter('goal_y_m', 0.0)
+    navigator.declare_parameter('use_start_goal_xy', False)
+    navigator.declare_parameter('blocked_edges', '')
     waypoints_file: str = (
         navigator.get_parameter('waypoints_file').get_parameter_value().string_value
+    )
+    road_network_file: str = (
+        navigator.get_parameter('road_network_file')
+        .get_parameter_value()
+        .string_value
+    )
+    route_name: str = navigator.get_parameter('route_name').get_parameter_value().string_value
+    route_nodes: str = navigator.get_parameter('route_nodes').get_parameter_value().string_value
+    route_frame_id: str = (
+        navigator.get_parameter('route_frame_id').get_parameter_value().string_value
+    )
+    coordinate_mode: str = (
+        navigator.get_parameter('coordinate_mode').get_parameter_value().string_value
+    )
+    map_origin_longitude_deg = (
+        navigator.get_parameter('map_origin_longitude_deg').get_parameter_value().double_value
+    )
+    map_origin_latitude_deg = (
+        navigator.get_parameter('map_origin_latitude_deg').get_parameter_value().double_value
+    )
+    map_origin_x_m = (
+        navigator.get_parameter('map_origin_x_m').get_parameter_value().double_value
+    )
+    map_origin_y_m = (
+        navigator.get_parameter('map_origin_y_m').get_parameter_value().double_value
+    )
+    map_origin_yaw_rad = (
+        navigator.get_parameter('map_origin_yaw_rad').get_parameter_value().double_value
+    )
+    start_node_id: str = (
+        navigator.get_parameter('start_node_id').get_parameter_value().string_value
+    )
+    goal_node_id: str = (
+        navigator.get_parameter('goal_node_id').get_parameter_value().string_value
+    )
+    use_start_goal_xy = (
+        navigator.get_parameter('use_start_goal_xy').get_parameter_value().bool_value
+    )
+    start_x_m = (
+        navigator.get_parameter('start_x_m').get_parameter_value().double_value
+        if use_start_goal_xy else None
+    )
+    start_y_m = (
+        navigator.get_parameter('start_y_m').get_parameter_value().double_value
+        if use_start_goal_xy else None
+    )
+    goal_x_m = (
+        navigator.get_parameter('goal_x_m').get_parameter_value().double_value
+        if use_start_goal_xy else None
+    )
+    goal_y_m = (
+        navigator.get_parameter('goal_y_m').get_parameter_value().double_value
+        if use_start_goal_xy else None
+    )
+    blocked_edges: str = (
+        navigator.get_parameter('blocked_edges').get_parameter_value().string_value
     )
     navigator.get_logger().info(f'Loading waypoints from: {waypoints_file}')
 
@@ -140,16 +246,42 @@ def main() -> None:
     # Load waypoints from YAML
     # ------------------------------------------------------------------
     try:
-        raw_waypoints = load_waypoints(waypoints_file)
+        if road_network_file:
+            raw_waypoints = load_route_waypoints(
+                file_path=road_network_file,
+                route_name=route_name or None,
+                route_nodes=route_nodes or None,
+                default_frame_id=route_frame_id,
+                coordinate_mode=coordinate_mode,
+                map_origin_longitude_deg=map_origin_longitude_deg,
+                map_origin_latitude_deg=map_origin_latitude_deg,
+                map_origin_yaw_rad=map_origin_yaw_rad,
+                map_origin_x_m=map_origin_x_m,
+                map_origin_y_m=map_origin_y_m,
+                start_node_id=start_node_id or None,
+                goal_node_id=goal_node_id or None,
+                start_x_m=start_x_m,
+                start_y_m=start_y_m,
+                goal_x_m=goal_x_m,
+                goal_y_m=goal_y_m,
+                blocked_edges=blocked_edges or None,
+            )
+            navigator.get_logger().info(
+                f'Loaded {len(raw_waypoints)} waypoint(s) from road network: '
+                f'{road_network_file}'
+            )
+        else:
+            raw_waypoints = load_waypoints(waypoints_file)
     except (FileNotFoundError, KeyError, ValueError) as exc:
         navigator.get_logger().fatal(f'[ERROR] {exc}')
         navigator.destroy_node()
         rclpy.shutdown()
         sys.exit(1)
 
-    navigator.get_logger().info(
-        f'Loaded {len(raw_waypoints)} waypoint(s) from YAML.'
-    )
+    if not road_network_file:
+        navigator.get_logger().info(
+            f'Loaded {len(raw_waypoints)} waypoint(s) from YAML.'
+        )
 
     # ------------------------------------------------------------------
     # Build PoseStamped list

@@ -22,6 +22,17 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     headless = LaunchConfiguration('headless')
     waypoint_file = LaunchConfiguration('waypoint_file')
+    road_network_file = LaunchConfiguration('road_network_file')
+    route_name = LaunchConfiguration('route_name')
+    route_nodes = LaunchConfiguration('route_nodes')
+    start_node_id = LaunchConfiguration('start_node_id')
+    goal_node_id = LaunchConfiguration('goal_node_id')
+    start_x_m = LaunchConfiguration('start_x_m')
+    start_y_m = LaunchConfiguration('start_y_m')
+    goal_x_m = LaunchConfiguration('goal_x_m')
+    goal_y_m = LaunchConfiguration('goal_y_m')
+    use_start_goal_xy = LaunchConfiguration('use_start_goal_xy')
+    blocked_edges = LaunchConfiguration('blocked_edges')
     coordinate_mode = LaunchConfiguration('coordinate_mode')
     map_origin_longitude_deg = LaunchConfiguration('map_origin_longitude_deg')
     map_origin_latitude_deg = LaunchConfiguration('map_origin_latitude_deg')
@@ -44,6 +55,9 @@ def generate_launch_description():
     default_waypoint_file = os.path.join(
         venom_bringup_dir, 'config', 'scout_mini', 'waypoint.txt'
     )
+    default_road_network_file = os.path.join(
+        venom_bringup_dir, 'config', 'scout_mini', 'road_network.yaml'
+    )
     default_nav2_params_file = os.path.join(
         venom_bringup_dir, 'config', 'scout_mini', 'craic_nav2_params.yaml'
     )
@@ -61,6 +75,17 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='false'),
         DeclareLaunchArgument('headless', default_value='false'),
         DeclareLaunchArgument('waypoint_file', default_value=default_waypoint_file),
+        DeclareLaunchArgument('road_network_file', default_value=''),
+        DeclareLaunchArgument('route_name', default_value=''),
+        DeclareLaunchArgument('route_nodes', default_value=''),
+        DeclareLaunchArgument('start_node_id', default_value=''),
+        DeclareLaunchArgument('goal_node_id', default_value=''),
+        DeclareLaunchArgument('start_x_m', default_value='0.0'),
+        DeclareLaunchArgument('start_y_m', default_value='0.0'),
+        DeclareLaunchArgument('goal_x_m', default_value='0.0'),
+        DeclareLaunchArgument('goal_y_m', default_value='0.0'),
+        DeclareLaunchArgument('use_start_goal_xy', default_value='false'),
+        DeclareLaunchArgument('blocked_edges', default_value=''),
         DeclareLaunchArgument('coordinate_mode', default_value='geodetic'),
         DeclareLaunchArgument('map_origin_longitude_deg', default_value='0.0'),
         DeclareLaunchArgument('map_origin_latitude_deg', default_value='0.0'),
@@ -264,6 +289,17 @@ def generate_launch_description():
             {
                 'use_sim_time': use_sim_time,
                 'waypoint_file': waypoint_file,
+                'road_network_file': road_network_file,
+                'route_name': route_name,
+                'route_nodes': route_nodes,
+                'start_node_id': start_node_id,
+                'goal_node_id': goal_node_id,
+                'start_x_m': start_x_m,
+                'start_y_m': start_y_m,
+                'goal_x_m': goal_x_m,
+                'goal_y_m': goal_y_m,
+                'use_start_goal_xy': use_start_goal_xy,
+                'blocked_edges': blocked_edges,
                 'coordinate_mode': coordinate_mode,
                 'map_origin_longitude_deg': map_origin_longitude_deg,
                 'map_origin_latitude_deg': map_origin_latitude_deg,
