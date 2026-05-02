@@ -64,6 +64,8 @@ setup(
             'venom_bringup.multi_waypoint_commander:main',
             'simple_waypoint_commander = '
             'venom_bringup.simple_waypoint_commander:main',
+            'simple_commander = '
+            'venom_bringup.simple_commander:main',
             'craic_mission_main = '
             'venom_bringup.craic_mission_main:main',
         ],
