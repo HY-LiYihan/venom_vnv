@@ -9,6 +9,7 @@ from typing import List, Optional
 
 import rclpy
 from geometry_msgs.msg import PoseStamped, Twist
+from lifecycle_msgs.srv import GetState
 from nav_msgs.msg import Odometry
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from rcl_interfaces.msg import ParameterDescriptor
@@ -118,6 +119,7 @@ class CraicMissionCommander(BasicNavigator):
         self.declare_parameter('waypoint_frame_id', 'map')
         self.declare_parameter('pose_tracking_topic', '/odometry/global')
         self.declare_parameter('cmd_vel_topic', '/cmd_vel')
+        self.declare_parameter('nav2_activation_timeout_sec', 60.0)
         self.declare_parameter('final_goal_stop_distance_m', 10.0)
         self.declare_parameter('stuck_timeout_sec', 10.0)
         self.declare_parameter('stuck_progress_radius_m', 0.8)
@@ -153,6 +155,9 @@ class CraicMissionCommander(BasicNavigator):
         self.waypoint_frame_id = self.get_parameter('waypoint_frame_id').value
         self.pose_tracking_topic = self.get_parameter('pose_tracking_topic').value
         self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        self.nav2_activation_timeout_sec = float(
+            self.get_parameter('nav2_activation_timeout_sec').value
+        )
         self.final_goal_stop_distance_m = float(
             self.get_parameter('final_goal_stop_distance_m').value
         )
@@ -207,7 +212,24 @@ class CraicMissionCommander(BasicNavigator):
             rclpy.spin_once(self, timeout_sec=0.05)
 
     def _wait_for_bt_navigator(self) -> None:
-        self.get_logger().info('Waiting for bt_navigator to become active...')
+        self.get_logger().info(
+            'Waiting for bt_navigator to become active '
+            f'(timeout: {self.nav2_activation_timeout_sec:.1f}s)...'
+        )
+        service_name = 'bt_navigator/get_state'
+        state_client = self.create_client(GetState, service_name)
+        deadline = time.monotonic() + self.nav2_activation_timeout_sec
+
+        while time.monotonic() < deadline and not state_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info(f'{service_name} service not available, waiting...')
+
+        if not state_client.service_is_ready():
+            raise RuntimeError(
+                'Timed out waiting for bt_navigator/get_state. '
+                'Nav2 is not active. Start your navigation launch first and '
+                'check bt_navigator, planner_server, and controller_server logs.'
+            )
+
         self._waitForNodeToActivate('bt_navigator')
 
     def _send_remaining_waypoints(self, start_index: int) -> bool:
@@ -227,6 +249,10 @@ class CraicMissionCommander(BasicNavigator):
         deadline = time.monotonic() + timeout_sec
         while time.monotonic() < deadline and not self.isTaskComplete():
             rclpy.spin_once(self, timeout_sec=0.1)
+
+    def _get_recovery_time_allowance(self) -> int:
+        """Return an integer time allowance accepted by Nav2 APIs."""
+        return max(1, math.ceil(self.recovery_time_allowance_sec))
 
     def _run_recovery_behavior(self) -> bool:
         if self._recovery_attempts >= self.max_recovery_attempts:
@@ -249,7 +275,7 @@ class CraicMissionCommander(BasicNavigator):
             if self.backup(
                 backup_dist=self.backup_distance_m,
                 backup_speed=self.backup_speed_mps,
-                time_allowance=self.recovery_time_allowance_sec,
+                time_allowance=self._get_recovery_time_allowance(),
             ):
                 self._wait_for_task_exit(self.recovery_time_allowance_sec)
 
@@ -259,7 +285,7 @@ class CraicMissionCommander(BasicNavigator):
             )
             if self.spin(
                 spin_dist=self.spin_angle_rad,
-                time_allowance=self.recovery_time_allowance_sec,
+                time_allowance=self._get_recovery_time_allowance(),
             ):
                 self._wait_for_task_exit(self.recovery_time_allowance_sec)
 
