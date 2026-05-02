@@ -70,6 +70,7 @@ class SimpleCommander(BasicNavigator):
         self._last_progress_pose_xy: Optional[tuple[float, float]] = None
         self._last_progress_time = time.monotonic()
         self._recovery_attempts = 0
+        self._following_waypoints = False
 
         self._log_loaded_route()
 
@@ -255,6 +256,7 @@ class SimpleCommander(BasicNavigator):
         self._current_abs_waypoint_index = start_index
         accepted = self.followWaypoints(self.poses_list[start_index:])
         if accepted:
+            self._following_waypoints = True
             self._last_progress_time = time.monotonic()
             self._last_progress_pose_xy = self._current_pose_xy
             self._log_current_waypoint(start_index)
@@ -272,6 +274,7 @@ class SimpleCommander(BasicNavigator):
     def _run_spin_recovery(self) -> bool:
         if self.spin_angle_rad <= 0.0:
             return False
+        self._following_waypoints = False
         self.get_logger().info(
             f'Running spin recovery for {self.spin_angle_rad:.2f} rad.'
         )
@@ -286,6 +289,7 @@ class SimpleCommander(BasicNavigator):
     def _run_backup_recovery(self) -> bool:
         if self.backup_distance_m <= 0.0:
             return False
+        self._following_waypoints = False
         self.get_logger().info(
             f'Running backup recovery for {self.backup_distance_m:.2f} m.'
         )
@@ -347,8 +351,14 @@ class SimpleCommander(BasicNavigator):
         )
 
     def _update_feedback_state(self) -> None:
+        if not self._following_waypoints:
+            return
+
         feedback = self.getFeedback()
         if feedback is None:
+            return
+
+        if not hasattr(feedback, 'current_waypoint'):
             return
 
         relative_index = int(feedback.current_waypoint)
@@ -403,6 +413,7 @@ class SimpleCommander(BasicNavigator):
 
             if self.isTaskComplete():
                 result = self.getResult()
+                self._following_waypoints = False
                 self._publish_zero_velocity()
                 if result == TaskResult.SUCCEEDED:
                     self.get_logger().info('Simple commander mission completed successfully.')

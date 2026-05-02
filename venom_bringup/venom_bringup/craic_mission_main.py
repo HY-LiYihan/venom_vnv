@@ -87,6 +87,7 @@ class CraicMissionCommander(BasicNavigator):
         self._last_progress_pose_xy: Optional[tuple[float, float]] = None
         self._last_progress_time = time.monotonic()
         self._recovery_attempts = 0
+        self._following_waypoints = False
 
     def _declare_parameters(self) -> None:
         self.declare_parameter(
@@ -240,6 +241,7 @@ class CraicMissionCommander(BasicNavigator):
         self._current_abs_waypoint_index = start_index
         accepted = self.followWaypoints(self._goal_poses[start_index:])
         if accepted:
+            self._following_waypoints = True
             self._last_progress_time = time.monotonic()
             self._last_progress_pose_xy = self._current_pose_xy
             self._log_current_waypoint(start_index)
@@ -265,6 +267,7 @@ class CraicMissionCommander(BasicNavigator):
         )
 
         self.cancelTask()
+        self._following_waypoints = False
         self._wait_for_task_exit(timeout_sec=3.0)
         self._publish_zero_velocity()
 
@@ -312,8 +315,14 @@ class CraicMissionCommander(BasicNavigator):
         )
 
     def _update_feedback_state(self) -> None:
+        if not self._following_waypoints:
+            return
+
         feedback = self.getFeedback()
         if feedback is None:
+            return
+
+        if not hasattr(feedback, 'current_waypoint'):
             return
 
         relative_index = int(feedback.current_waypoint)
@@ -382,6 +391,7 @@ class CraicMissionCommander(BasicNavigator):
 
             if self.isTaskComplete():
                 result = self.getResult()
+                self._following_waypoints = False
                 self._publish_zero_velocity()
                 if result == TaskResult.SUCCEEDED:
                     self.get_logger().info('CRAIC mission completed successfully.')
