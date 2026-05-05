@@ -181,6 +181,17 @@ class SimpleCommander(BasicNavigator):
         self.declare_parameter('cruise_max_angular_speed_radps', 1.6)
         self.declare_parameter('cruise_xy_goal_tolerance_m', 0.5)
         self.declare_parameter('cruise_yaw_goal_tolerance_rad', 0.4)
+        self.declare_parameter('action_control_rate_hz', 20.0)
+        self.declare_parameter('action_heading_kp', 1.6)
+        self.declare_parameter('action_linear_kp', 0.8)
+        self.declare_parameter('action_min_angular_speed_radps', 0.18)
+        self.declare_parameter('action_min_linear_speed_mps', 0.05)
+        self.declare_parameter('action_heading_gate_rad', 0.45)
+        self.declare_parameter('special_action_entry_distance_m', 1.2)
+        self.declare_parameter('turn_action_timeout_sec', 10.0)
+        self.declare_parameter('park_action_timeout_sec', 15.0)
+        self.declare_parameter('turn_creep_max_linear_mps', 0.25)
+        self.declare_parameter('park_final_align_max_angular_speed_radps', 0.35)
         self.declare_parameter('special_action_retry_limit', 2)
 
     def _load_parameters(self) -> None:
@@ -294,6 +305,35 @@ class SimpleCommander(BasicNavigator):
         self.cruise_yaw_goal_tolerance_rad = float(
             self.get_parameter('cruise_yaw_goal_tolerance_rad').value
         )
+        self.action_control_rate_hz = float(
+            self.get_parameter('action_control_rate_hz').value
+        )
+        self.action_heading_kp = float(self.get_parameter('action_heading_kp').value)
+        self.action_linear_kp = float(self.get_parameter('action_linear_kp').value)
+        self.action_min_angular_speed_radps = float(
+            self.get_parameter('action_min_angular_speed_radps').value
+        )
+        self.action_min_linear_speed_mps = float(
+            self.get_parameter('action_min_linear_speed_mps').value
+        )
+        self.action_heading_gate_rad = float(
+            self.get_parameter('action_heading_gate_rad').value
+        )
+        self.special_action_entry_distance_m = float(
+            self.get_parameter('special_action_entry_distance_m').value
+        )
+        self.turn_action_timeout_sec = float(
+            self.get_parameter('turn_action_timeout_sec').value
+        )
+        self.park_action_timeout_sec = float(
+            self.get_parameter('park_action_timeout_sec').value
+        )
+        self.turn_creep_max_linear_mps = float(
+            self.get_parameter('turn_creep_max_linear_mps').value
+        )
+        self.park_final_align_max_angular_speed_radps = float(
+            self.get_parameter('park_final_align_max_angular_speed_radps').value
+        )
         self.special_action_retry_limit = int(
             self.get_parameter('special_action_retry_limit').value
         )
@@ -390,6 +430,160 @@ class SimpleCommander(BasicNavigator):
         for _ in range(repeat_count):
             self._cmd_vel_pub.publish(stop_msg)
             rclpy.spin_once(self, timeout_sec=0.05)
+
+    def _publish_velocity(self, linear_x: float, angular_z: float) -> None:
+        cmd_msg = Twist()
+        cmd_msg.linear.x = float(linear_x)
+        cmd_msg.angular.z = float(angular_z)
+        self._cmd_vel_pub.publish(cmd_msg)
+
+    def _sleep_with_spin(self, duration_sec: float) -> None:
+        deadline = time.monotonic() + max(0.0, duration_sec)
+        while time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.05)
+
+    def _clamp(self, value: float, lower_bound: float, upper_bound: float) -> float:
+        return max(lower_bound, min(upper_bound, value))
+
+    def _distance_to_waypoint(self, waypoint: CraicWaypoint) -> Optional[float]:
+        if self._current_pose_xy is None:
+            return None
+        return distance_xy(
+            self._current_pose_xy[0],
+            self._current_pose_xy[1],
+            waypoint.x,
+            waypoint.y,
+        )
+
+    def _rotate_to_yaw(
+        self,
+        target_yaw: float,
+        yaw_tolerance_rad: float,
+        max_angular_speed_radps: float,
+        timeout_sec: float,
+    ) -> bool:
+        deadline = time.monotonic() + timeout_sec
+        while time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=1.0 / max(self.action_control_rate_hz, 1.0))
+            if self._current_yaw is None:
+                continue
+
+            yaw_error = normalize_angle(target_yaw - self._current_yaw)
+            if abs(yaw_error) <= yaw_tolerance_rad:
+                self._publish_zero_velocity()
+                return True
+
+            angular_speed = self._clamp(
+                abs(yaw_error) * self.action_heading_kp,
+                self.action_min_angular_speed_radps,
+                max_angular_speed_radps,
+            )
+            self._publish_velocity(0.0, math.copysign(angular_speed, yaw_error))
+
+        self._publish_zero_velocity()
+        return False
+
+    def _creep_to_waypoint(
+        self,
+        waypoint: CraicWaypoint,
+        position_tolerance_m: float,
+        max_linear_speed_mps: float,
+        max_angular_speed_radps: float,
+        timeout_sec: float,
+    ) -> bool:
+        deadline = time.monotonic() + timeout_sec
+        while time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=1.0 / max(self.action_control_rate_hz, 1.0))
+            if self._current_pose_xy is None or self._current_yaw is None:
+                continue
+
+            dx = waypoint.x - self._current_pose_xy[0]
+            dy = waypoint.y - self._current_pose_xy[1]
+            distance_error = math.hypot(dx, dy)
+            if distance_error <= position_tolerance_m:
+                self._publish_zero_velocity()
+                return True
+
+            target_heading = math.atan2(dy, dx)
+            heading_error = normalize_angle(target_heading - self._current_yaw)
+            if abs(heading_error) > self.action_heading_gate_rad:
+                angular_speed = self._clamp(
+                    abs(heading_error) * self.action_heading_kp,
+                    self.action_min_angular_speed_radps,
+                    max_angular_speed_radps,
+                )
+                self._publish_velocity(0.0, math.copysign(angular_speed, heading_error))
+                continue
+
+            linear_speed = self._clamp(
+                distance_error * self.action_linear_kp,
+                self.action_min_linear_speed_mps,
+                max_linear_speed_mps,
+            )
+            angular_speed = self._clamp(
+                heading_error * self.action_heading_kp,
+                -max_angular_speed_radps,
+                max_angular_speed_radps,
+            )
+            self._publish_velocity(linear_speed, angular_speed)
+
+        self._publish_zero_velocity()
+        return False
+
+    def _execute_turn_action(
+        self,
+        waypoint: CraicWaypoint,
+        plan: WaypointExecutionPlan,
+    ) -> bool:
+        distance_error = self._distance_to_waypoint(waypoint)
+        if distance_error is None:
+            return False
+
+        if distance_error > self.special_action_entry_distance_m:
+            self.get_logger().warn(
+                f'{plan.profile_name} is still {distance_error:.2f} m away from the action waypoint; '
+                'running a short low-speed creep before final heading alignment.'
+            )
+            if not self._creep_to_waypoint(
+                waypoint,
+                plan.position_tolerance_m or 0.35,
+                min(plan.max_linear_speed_mps, self.turn_creep_max_linear_mps),
+                plan.max_angular_speed_radps,
+                timeout_sec=self.turn_action_timeout_sec,
+            ):
+                return False
+
+        self._publish_zero_velocity()
+        self._sleep_with_spin(plan.settle_time_sec)
+        return self._rotate_to_yaw(
+            waypoint.yaw,
+            plan.yaw_tolerance_rad or 0.25,
+            plan.max_angular_speed_radps,
+            timeout_sec=self.turn_action_timeout_sec,
+        )
+
+    def _execute_park_action(
+        self,
+        waypoint: CraicWaypoint,
+        plan: WaypointExecutionPlan,
+    ) -> bool:
+        if not self._creep_to_waypoint(
+            waypoint,
+            plan.position_tolerance_m or 0.18,
+            plan.max_linear_speed_mps,
+            min(plan.max_angular_speed_radps, self.park_final_align_max_angular_speed_radps),
+            timeout_sec=self.park_action_timeout_sec,
+        ):
+            return False
+
+        self._publish_zero_velocity()
+        self._sleep_with_spin(plan.settle_time_sec)
+        return self._rotate_to_yaw(
+            waypoint.yaw,
+            plan.yaw_tolerance_rad or 0.12,
+            min(plan.max_angular_speed_radps, self.park_final_align_max_angular_speed_radps),
+            timeout_sec=self.park_action_timeout_sec,
+        )
 
     def _wait_for_bt_navigator(self) -> None:
         self.get_logger().info(
@@ -652,7 +846,16 @@ class SimpleCommander(BasicNavigator):
         if self._active_plan is None or not self._active_plan.is_special_action:
             return None, False
 
-        if self._is_active_special_action_satisfied():
+        goal_waypoint = self._waypoints[self._active_plan.goal_index]
+        action_success = False
+        if self._active_plan.profile_name in {'turn_left', 'turn_right'}:
+            action_success = self._execute_turn_action(goal_waypoint, self._active_plan)
+        elif self._active_plan.profile_name == 'park':
+            action_success = self._execute_park_action(goal_waypoint, self._active_plan)
+        else:
+            action_success = self._is_active_special_action_satisfied()
+
+        if action_success and self._is_active_special_action_satisfied():
             if self._active_plan.settle_time_sec > 0.0:
                 self.get_logger().info(
                     f'{self._active_plan.profile_name} goal satisfied; settling for '
@@ -671,14 +874,12 @@ class SimpleCommander(BasicNavigator):
 
         self._special_action_retry_count += 1
         if self._special_action_retry_count > self._active_plan.goal_retry_limit:
-            goal_waypoint = self._waypoints[self._active_plan.goal_index]
             self.get_logger().error(
                 f'{self._active_plan.profile_name} waypoint failed strict check at '
                 f'x={goal_waypoint.x:.2f}, y={goal_waypoint.y:.2f}.'
             )
             return 1, True
 
-        goal_waypoint = self._waypoints[self._active_plan.goal_index]
         self.get_logger().warn(
             f'{self._active_plan.profile_name} waypoint needs a tighter retry '
             f'({self._special_action_retry_count}/{self._active_plan.goal_retry_limit}) '
