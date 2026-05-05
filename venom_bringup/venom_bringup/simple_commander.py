@@ -647,9 +647,9 @@ class SimpleCommander(BasicNavigator):
                 return False
         return True
 
-    def _handle_special_action_completion(self) -> Optional[int]:
+    def _handle_special_action_completion(self) -> tuple[Optional[int], bool]:
         if self._active_plan is None or not self._active_plan.is_special_action:
-            return None
+            return None, False
 
         if self._is_active_special_action_satisfied():
             if self._active_plan.settle_time_sec > 0.0:
@@ -662,11 +662,11 @@ class SimpleCommander(BasicNavigator):
             next_index = self._active_plan.goal_index + 1
             if next_index >= len(self._waypoints):
                 self.get_logger().info('Simple commander mission completed successfully.')
-                return 0
+                return 0, True
             if not self._send_remaining_waypoints(next_index):
                 self.get_logger().error('Nav2 rejected the follow-up waypoint mission.')
-                return 1
-            return None
+                return 1, True
+            return None, True
 
         self._special_action_retry_count += 1
         if self._special_action_retry_count > self._active_plan.goal_retry_limit:
@@ -675,7 +675,7 @@ class SimpleCommander(BasicNavigator):
                 f'{self._active_plan.profile_name} waypoint failed strict check at '
                 f'x={goal_waypoint.x:.2f}, y={goal_waypoint.y:.2f}.'
             )
-            return 1
+            return 1, True
 
         goal_waypoint = self._waypoints[self._active_plan.goal_index]
         self.get_logger().warn(
@@ -685,8 +685,8 @@ class SimpleCommander(BasicNavigator):
         )
         if not self._send_plan(self._active_plan, reset_special_retry_count=False):
             self.get_logger().error('Nav2 rejected the strict action retry.')
-            return 1
-        return None
+            return 1, True
+        return None, True
 
     def _update_feedback_state(self) -> None:
         if not self._following_waypoints:
@@ -755,9 +755,13 @@ class SimpleCommander(BasicNavigator):
                 self._following_waypoints = False
                 self._publish_zero_velocity()
                 if result == TaskResult.SUCCEEDED:
-                    special_action_result = self._handle_special_action_completion()
+                    special_action_result, special_action_handled = (
+                        self._handle_special_action_completion()
+                    )
                     if special_action_result is not None:
                         return special_action_result
+                    if special_action_handled:
+                        continue
                     next_index = (
                         self._active_plan.goal_index + 1 if self._active_plan is not None else len(self._waypoints)
                     )

@@ -117,3 +117,22 @@ def test_resume_plan_keeps_special_action_singleton():
     resumed = build_resume_plan(plan, 0)
 
     assert resumed == plan
+
+
+def test_special_action_plan_remains_singleton_for_retry():
+    config = WaypointBehaviorConfig(default_final_stop_distance_m=1.0)
+    waypoints = [
+        make_waypoint(0, 3, 3.0),
+        make_waypoint(1, 2, 5.0),
+        make_waypoint(2, 1, 8.0),
+    ]
+
+    turn_left_plan = build_execution_plan(waypoints, 0, config)
+    retried_turn_left_plan = build_resume_plan(turn_left_plan, 0)
+    next_plan = build_execution_plan(waypoints, 1, config)
+
+    assert retried_turn_left_plan.start_index == 0
+    assert retried_turn_left_plan.goal_index == 0
+    assert retried_turn_left_plan.profile_name == 'turn_left'
+    assert next_plan.start_index == 1
+    assert next_plan.profile_name == 'turn_right'
