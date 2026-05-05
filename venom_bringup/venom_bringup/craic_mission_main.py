@@ -410,7 +410,8 @@ class CraicMissionCommander(BasicNavigator):
             rclpy.spin_once(self, timeout_sec=0.1)
 
             pose_ready = (not self.require_pose_topic) or (self._current_pose_xy is not None)
-            map_ready = (not self.require_map_topic) or ('/map' in self.get_topic_names_and_types())
+            topic_names = {name for name, _types in self.get_topic_names_and_types()}
+            map_ready = (not self.require_map_topic) or ('/map' in topic_names)
             tf_ready = True
             if self.require_tf_ready:
                 try:
@@ -439,7 +440,7 @@ class CraicMissionCommander(BasicNavigator):
         raise RuntimeError(
             'Timed out waiting for runtime readiness. '
             f'pose_ready={self._current_pose_xy is not None}, '
-            f'map_ready={"/map" in self.get_topic_names_and_types()}, '
+            f'map_ready={"/map" in {name for name, _types in self.get_topic_names_and_types()}}, '
             f'tf_ready={self._tf_buffer.can_transform(self.global_frame, self.robot_base_frame, rclpy.time.Time()) if self.require_tf_ready else True}.'
         )
 
