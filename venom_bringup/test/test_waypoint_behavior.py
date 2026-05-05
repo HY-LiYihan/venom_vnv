@@ -80,6 +80,50 @@ def test_park_plan_uses_parking_profile():
     assert plan.yaw_goal_tolerance_rad == config.park_yaw_tolerance_rad
 
 
+def test_lane_change_left_plan_uses_lane_change_profile():
+    config = WaypointBehaviorConfig(default_final_stop_distance_m=1.0)
+    waypoints = [make_waypoint(0, 4, 0.0)]
+
+    plan = build_execution_plan(waypoints, 0, config)
+
+    assert plan.profile_name == 'lane_change_left'
+    assert plan.max_linear_speed_mps == config.lane_change_left_max_linear_speed_mps
+    assert plan.xy_goal_tolerance_m == config.lane_change_left_position_tolerance_m
+
+
+def test_lane_change_right_plan_uses_lane_change_profile():
+    config = WaypointBehaviorConfig(default_final_stop_distance_m=1.0)
+    waypoints = [make_waypoint(0, 5, 0.0)]
+
+    plan = build_execution_plan(waypoints, 0, config)
+
+    assert plan.profile_name == 'lane_change_right'
+    assert plan.max_linear_speed_mps == config.lane_change_right_max_linear_speed_mps
+    assert plan.xy_goal_tolerance_m == config.lane_change_right_position_tolerance_m
+
+
+def test_overtake_plan_uses_overtake_profile():
+    config = WaypointBehaviorConfig(default_final_stop_distance_m=1.0)
+    waypoints = [make_waypoint(0, 6, 0.0)]
+
+    plan = build_execution_plan(waypoints, 0, config)
+
+    assert plan.profile_name == 'overtake'
+    assert plan.max_linear_speed_mps == config.overtake_max_linear_speed_mps
+    assert plan.xy_goal_tolerance_m == config.overtake_position_tolerance_m
+
+
+def test_u_turn_plan_uses_u_turn_profile():
+    config = WaypointBehaviorConfig(default_final_stop_distance_m=1.0)
+    waypoints = [make_waypoint(0, 7, 0.0)]
+
+    plan = build_execution_plan(waypoints, 0, config)
+
+    assert plan.profile_name == 'u_turn'
+    assert plan.max_linear_speed_mps == config.u_turn_max_linear_speed_mps
+    assert plan.xy_goal_tolerance_m == config.u_turn_position_tolerance_m
+
+
 def test_last_default_segment_keeps_final_stop_distance():
     config = WaypointBehaviorConfig(default_final_stop_distance_m=1.5)
     waypoints = [

@@ -109,6 +109,30 @@ class SimpleCommander(BasicNavigator):
             right_turn_position_tolerance_m=self.right_turn_position_tolerance_m,
             right_turn_yaw_tolerance_rad=self.right_turn_yaw_tolerance_rad,
             right_turn_settle_time_sec=self.right_turn_settle_time_sec,
+            lane_change_left_max_linear_speed_mps=self.lane_change_left_max_linear_speed_mps,
+            lane_change_left_max_speed_xy_mps=self.lane_change_left_max_speed_xy_mps,
+            lane_change_left_max_angular_speed_radps=self.lane_change_left_max_angular_speed_radps,
+            lane_change_left_position_tolerance_m=self.lane_change_left_position_tolerance_m,
+            lane_change_left_yaw_tolerance_rad=self.lane_change_left_yaw_tolerance_rad,
+            lane_change_left_settle_time_sec=self.lane_change_left_settle_time_sec,
+            lane_change_right_max_linear_speed_mps=self.lane_change_right_max_linear_speed_mps,
+            lane_change_right_max_speed_xy_mps=self.lane_change_right_max_speed_xy_mps,
+            lane_change_right_max_angular_speed_radps=self.lane_change_right_max_angular_speed_radps,
+            lane_change_right_position_tolerance_m=self.lane_change_right_position_tolerance_m,
+            lane_change_right_yaw_tolerance_rad=self.lane_change_right_yaw_tolerance_rad,
+            lane_change_right_settle_time_sec=self.lane_change_right_settle_time_sec,
+            overtake_max_linear_speed_mps=self.overtake_max_linear_speed_mps,
+            overtake_max_speed_xy_mps=self.overtake_max_speed_xy_mps,
+            overtake_max_angular_speed_radps=self.overtake_max_angular_speed_radps,
+            overtake_position_tolerance_m=self.overtake_position_tolerance_m,
+            overtake_yaw_tolerance_rad=self.overtake_yaw_tolerance_rad,
+            overtake_settle_time_sec=self.overtake_settle_time_sec,
+            u_turn_max_linear_speed_mps=self.u_turn_max_linear_speed_mps,
+            u_turn_max_speed_xy_mps=self.u_turn_max_speed_xy_mps,
+            u_turn_max_angular_speed_radps=self.u_turn_max_angular_speed_radps,
+            u_turn_position_tolerance_m=self.u_turn_position_tolerance_m,
+            u_turn_yaw_tolerance_rad=self.u_turn_yaw_tolerance_rad,
+            u_turn_settle_time_sec=self.u_turn_settle_time_sec,
             park_max_linear_speed_mps=self.park_max_linear_speed_mps,
             park_max_speed_xy_mps=self.park_max_speed_xy_mps,
             park_max_angular_speed_radps=self.park_max_angular_speed_radps,
@@ -170,6 +194,30 @@ class SimpleCommander(BasicNavigator):
         self.declare_parameter('right_turn_max_linear_speed_mps', 0.65)
         self.declare_parameter('right_turn_max_speed_xy_mps', 0.65)
         self.declare_parameter('right_turn_max_angular_speed_radps', 0.8)
+        self.declare_parameter('lane_change_left_position_tolerance_m', 0.28)
+        self.declare_parameter('lane_change_left_yaw_tolerance_rad', 0.20)
+        self.declare_parameter('lane_change_left_settle_time_sec', 0.25)
+        self.declare_parameter('lane_change_left_max_linear_speed_mps', 0.95)
+        self.declare_parameter('lane_change_left_max_speed_xy_mps', 0.95)
+        self.declare_parameter('lane_change_left_max_angular_speed_radps', 0.75)
+        self.declare_parameter('lane_change_right_position_tolerance_m', 0.28)
+        self.declare_parameter('lane_change_right_yaw_tolerance_rad', 0.20)
+        self.declare_parameter('lane_change_right_settle_time_sec', 0.25)
+        self.declare_parameter('lane_change_right_max_linear_speed_mps', 0.90)
+        self.declare_parameter('lane_change_right_max_speed_xy_mps', 0.90)
+        self.declare_parameter('lane_change_right_max_angular_speed_radps', 0.70)
+        self.declare_parameter('overtake_position_tolerance_m', 0.40)
+        self.declare_parameter('overtake_yaw_tolerance_rad', 0.28)
+        self.declare_parameter('overtake_settle_time_sec', 0.15)
+        self.declare_parameter('overtake_max_linear_speed_mps', 1.15)
+        self.declare_parameter('overtake_max_speed_xy_mps', 1.15)
+        self.declare_parameter('overtake_max_angular_speed_radps', 0.75)
+        self.declare_parameter('u_turn_position_tolerance_m', 0.25)
+        self.declare_parameter('u_turn_yaw_tolerance_rad', 0.16)
+        self.declare_parameter('u_turn_settle_time_sec', 0.50)
+        self.declare_parameter('u_turn_max_linear_speed_mps', 0.45)
+        self.declare_parameter('u_turn_max_speed_xy_mps', 0.45)
+        self.declare_parameter('u_turn_max_angular_speed_radps', 0.70)
         self.declare_parameter('park_position_tolerance_m', 0.18)
         self.declare_parameter('park_yaw_tolerance_rad', 0.12)
         self.declare_parameter('park_settle_time_sec', 1.0)
@@ -271,6 +319,78 @@ class SimpleCommander(BasicNavigator):
         )
         self.right_turn_max_angular_speed_radps = float(
             self.get_parameter('right_turn_max_angular_speed_radps').value
+        )
+        self.lane_change_left_position_tolerance_m = float(
+            self.get_parameter('lane_change_left_position_tolerance_m').value
+        )
+        self.lane_change_left_yaw_tolerance_rad = float(
+            self.get_parameter('lane_change_left_yaw_tolerance_rad').value
+        )
+        self.lane_change_left_settle_time_sec = float(
+            self.get_parameter('lane_change_left_settle_time_sec').value
+        )
+        self.lane_change_left_max_linear_speed_mps = float(
+            self.get_parameter('lane_change_left_max_linear_speed_mps').value
+        )
+        self.lane_change_left_max_speed_xy_mps = float(
+            self.get_parameter('lane_change_left_max_speed_xy_mps').value
+        )
+        self.lane_change_left_max_angular_speed_radps = float(
+            self.get_parameter('lane_change_left_max_angular_speed_radps').value
+        )
+        self.lane_change_right_position_tolerance_m = float(
+            self.get_parameter('lane_change_right_position_tolerance_m').value
+        )
+        self.lane_change_right_yaw_tolerance_rad = float(
+            self.get_parameter('lane_change_right_yaw_tolerance_rad').value
+        )
+        self.lane_change_right_settle_time_sec = float(
+            self.get_parameter('lane_change_right_settle_time_sec').value
+        )
+        self.lane_change_right_max_linear_speed_mps = float(
+            self.get_parameter('lane_change_right_max_linear_speed_mps').value
+        )
+        self.lane_change_right_max_speed_xy_mps = float(
+            self.get_parameter('lane_change_right_max_speed_xy_mps').value
+        )
+        self.lane_change_right_max_angular_speed_radps = float(
+            self.get_parameter('lane_change_right_max_angular_speed_radps').value
+        )
+        self.overtake_position_tolerance_m = float(
+            self.get_parameter('overtake_position_tolerance_m').value
+        )
+        self.overtake_yaw_tolerance_rad = float(
+            self.get_parameter('overtake_yaw_tolerance_rad').value
+        )
+        self.overtake_settle_time_sec = float(
+            self.get_parameter('overtake_settle_time_sec').value
+        )
+        self.overtake_max_linear_speed_mps = float(
+            self.get_parameter('overtake_max_linear_speed_mps').value
+        )
+        self.overtake_max_speed_xy_mps = float(
+            self.get_parameter('overtake_max_speed_xy_mps').value
+        )
+        self.overtake_max_angular_speed_radps = float(
+            self.get_parameter('overtake_max_angular_speed_radps').value
+        )
+        self.u_turn_position_tolerance_m = float(
+            self.get_parameter('u_turn_position_tolerance_m').value
+        )
+        self.u_turn_yaw_tolerance_rad = float(
+            self.get_parameter('u_turn_yaw_tolerance_rad').value
+        )
+        self.u_turn_settle_time_sec = float(
+            self.get_parameter('u_turn_settle_time_sec').value
+        )
+        self.u_turn_max_linear_speed_mps = float(
+            self.get_parameter('u_turn_max_linear_speed_mps').value
+        )
+        self.u_turn_max_speed_xy_mps = float(
+            self.get_parameter('u_turn_max_speed_xy_mps').value
+        )
+        self.u_turn_max_angular_speed_radps = float(
+            self.get_parameter('u_turn_max_angular_speed_radps').value
         )
         self.park_position_tolerance_m = float(
             self.get_parameter('park_position_tolerance_m').value
@@ -562,6 +682,75 @@ class SimpleCommander(BasicNavigator):
             timeout_sec=self.turn_action_timeout_sec,
         )
 
+    def _execute_lane_change_action(
+        self,
+        waypoint: CraicWaypoint,
+        plan: WaypointExecutionPlan,
+    ) -> bool:
+        if not self._creep_to_waypoint(
+            waypoint,
+            plan.position_tolerance_m or 0.28,
+            plan.max_linear_speed_mps,
+            plan.max_angular_speed_radps,
+            timeout_sec=self.turn_action_timeout_sec,
+        ):
+            return False
+
+        self._publish_zero_velocity()
+        self._sleep_with_spin(plan.settle_time_sec)
+        return self._rotate_to_yaw(
+            waypoint.yaw,
+            plan.yaw_tolerance_rad or 0.20,
+            min(plan.max_angular_speed_radps, 0.8),
+            timeout_sec=self.turn_action_timeout_sec,
+        )
+
+    def _execute_overtake_action(
+        self,
+        waypoint: CraicWaypoint,
+        plan: WaypointExecutionPlan,
+    ) -> bool:
+        if not self._creep_to_waypoint(
+            waypoint,
+            plan.position_tolerance_m or 0.40,
+            plan.max_linear_speed_mps,
+            plan.max_angular_speed_radps,
+            timeout_sec=self.turn_action_timeout_sec,
+        ):
+            return False
+
+        self._publish_zero_velocity()
+        self._sleep_with_spin(plan.settle_time_sec)
+        return self._rotate_to_yaw(
+            waypoint.yaw,
+            plan.yaw_tolerance_rad or 0.28,
+            min(plan.max_angular_speed_radps, 0.8),
+            timeout_sec=self.turn_action_timeout_sec,
+        )
+
+    def _execute_u_turn_action(
+        self,
+        waypoint: CraicWaypoint,
+        plan: WaypointExecutionPlan,
+    ) -> bool:
+        if not self._creep_to_waypoint(
+            waypoint,
+            plan.position_tolerance_m or 0.25,
+            min(plan.max_linear_speed_mps, self.turn_creep_max_linear_mps),
+            plan.max_angular_speed_radps,
+            timeout_sec=self.turn_action_timeout_sec,
+        ):
+            return False
+
+        self._publish_zero_velocity()
+        self._sleep_with_spin(plan.settle_time_sec)
+        return self._rotate_to_yaw(
+            waypoint.yaw,
+            plan.yaw_tolerance_rad or 0.16,
+            plan.max_angular_speed_radps,
+            timeout_sec=max(self.turn_action_timeout_sec, 12.0),
+        )
+
     def _execute_park_action(
         self,
         waypoint: CraicWaypoint,
@@ -850,6 +1039,12 @@ class SimpleCommander(BasicNavigator):
         action_success = False
         if self._active_plan.profile_name in {'turn_left', 'turn_right'}:
             action_success = self._execute_turn_action(goal_waypoint, self._active_plan)
+        elif self._active_plan.profile_name in {'lane_change_left', 'lane_change_right'}:
+            action_success = self._execute_lane_change_action(goal_waypoint, self._active_plan)
+        elif self._active_plan.profile_name == 'overtake':
+            action_success = self._execute_overtake_action(goal_waypoint, self._active_plan)
+        elif self._active_plan.profile_name == 'u_turn':
+            action_success = self._execute_u_turn_action(goal_waypoint, self._active_plan)
         elif self._active_plan.profile_name == 'park':
             action_success = self._execute_park_action(goal_waypoint, self._active_plan)
         else:

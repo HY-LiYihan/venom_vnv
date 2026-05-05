@@ -11,7 +11,20 @@ from venom_bringup.craic_waypoint_utils import CraicWaypoint
 
 TURN_RIGHT_ACTION = 2
 TURN_LEFT_ACTION = 3
+LANE_CHANGE_LEFT_ACTION = 4
+LANE_CHANGE_RIGHT_ACTION = 5
+OVERTAKE_ACTION = 6
+U_TURN_ACTION = 7
 PARK_ACTION = 8
+SPECIAL_ACTIONS = {
+    TURN_RIGHT_ACTION,
+    TURN_LEFT_ACTION,
+    LANE_CHANGE_LEFT_ACTION,
+    LANE_CHANGE_RIGHT_ACTION,
+    OVERTAKE_ACTION,
+    U_TURN_ACTION,
+    PARK_ACTION,
+}
 
 
 def normalize_angle(angle: float) -> float:
@@ -46,6 +59,30 @@ class WaypointBehaviorConfig:
     right_turn_position_tolerance_m: float = 0.35
     right_turn_yaw_tolerance_rad: float = 0.30
     right_turn_settle_time_sec: float = 0.20
+    lane_change_left_max_linear_speed_mps: float = 0.95
+    lane_change_left_max_speed_xy_mps: float = 0.95
+    lane_change_left_max_angular_speed_radps: float = 0.75
+    lane_change_left_position_tolerance_m: float = 0.28
+    lane_change_left_yaw_tolerance_rad: float = 0.20
+    lane_change_left_settle_time_sec: float = 0.25
+    lane_change_right_max_linear_speed_mps: float = 0.90
+    lane_change_right_max_speed_xy_mps: float = 0.90
+    lane_change_right_max_angular_speed_radps: float = 0.70
+    lane_change_right_position_tolerance_m: float = 0.28
+    lane_change_right_yaw_tolerance_rad: float = 0.20
+    lane_change_right_settle_time_sec: float = 0.25
+    overtake_max_linear_speed_mps: float = 1.15
+    overtake_max_speed_xy_mps: float = 1.15
+    overtake_max_angular_speed_radps: float = 0.75
+    overtake_position_tolerance_m: float = 0.40
+    overtake_yaw_tolerance_rad: float = 0.28
+    overtake_settle_time_sec: float = 0.15
+    u_turn_max_linear_speed_mps: float = 0.45
+    u_turn_max_speed_xy_mps: float = 0.45
+    u_turn_max_angular_speed_radps: float = 0.70
+    u_turn_position_tolerance_m: float = 0.25
+    u_turn_yaw_tolerance_rad: float = 0.16
+    u_turn_settle_time_sec: float = 0.50
     park_max_linear_speed_mps: float = 0.35
     park_max_speed_xy_mps: float = 0.35
     park_max_angular_speed_radps: float = 0.45
@@ -116,6 +153,70 @@ def build_execution_plan(
             settle_time_sec=config.right_turn_settle_time_sec,
             goal_retry_limit=config.special_action_retry_limit,
         )
+    if waypoint.action == LANE_CHANGE_LEFT_ACTION:
+        return WaypointExecutionPlan(
+            profile_name='lane_change_left',
+            start_index=start_index,
+            end_index=start_index,
+            goal_index=start_index,
+            max_linear_speed_mps=config.lane_change_left_max_linear_speed_mps,
+            max_speed_xy_mps=config.lane_change_left_max_speed_xy_mps,
+            max_angular_speed_radps=config.lane_change_left_max_angular_speed_radps,
+            xy_goal_tolerance_m=config.lane_change_left_position_tolerance_m,
+            yaw_goal_tolerance_rad=config.lane_change_left_yaw_tolerance_rad,
+            position_tolerance_m=config.lane_change_left_position_tolerance_m,
+            yaw_tolerance_rad=config.lane_change_left_yaw_tolerance_rad,
+            settle_time_sec=config.lane_change_left_settle_time_sec,
+            goal_retry_limit=config.special_action_retry_limit,
+        )
+    if waypoint.action == LANE_CHANGE_RIGHT_ACTION:
+        return WaypointExecutionPlan(
+            profile_name='lane_change_right',
+            start_index=start_index,
+            end_index=start_index,
+            goal_index=start_index,
+            max_linear_speed_mps=config.lane_change_right_max_linear_speed_mps,
+            max_speed_xy_mps=config.lane_change_right_max_speed_xy_mps,
+            max_angular_speed_radps=config.lane_change_right_max_angular_speed_radps,
+            xy_goal_tolerance_m=config.lane_change_right_position_tolerance_m,
+            yaw_goal_tolerance_rad=config.lane_change_right_yaw_tolerance_rad,
+            position_tolerance_m=config.lane_change_right_position_tolerance_m,
+            yaw_tolerance_rad=config.lane_change_right_yaw_tolerance_rad,
+            settle_time_sec=config.lane_change_right_settle_time_sec,
+            goal_retry_limit=config.special_action_retry_limit,
+        )
+    if waypoint.action == OVERTAKE_ACTION:
+        return WaypointExecutionPlan(
+            profile_name='overtake',
+            start_index=start_index,
+            end_index=start_index,
+            goal_index=start_index,
+            max_linear_speed_mps=config.overtake_max_linear_speed_mps,
+            max_speed_xy_mps=config.overtake_max_speed_xy_mps,
+            max_angular_speed_radps=config.overtake_max_angular_speed_radps,
+            xy_goal_tolerance_m=config.overtake_position_tolerance_m,
+            yaw_goal_tolerance_rad=config.overtake_yaw_tolerance_rad,
+            position_tolerance_m=config.overtake_position_tolerance_m,
+            yaw_tolerance_rad=config.overtake_yaw_tolerance_rad,
+            settle_time_sec=config.overtake_settle_time_sec,
+            goal_retry_limit=config.special_action_retry_limit,
+        )
+    if waypoint.action == U_TURN_ACTION:
+        return WaypointExecutionPlan(
+            profile_name='u_turn',
+            start_index=start_index,
+            end_index=start_index,
+            goal_index=start_index,
+            max_linear_speed_mps=config.u_turn_max_linear_speed_mps,
+            max_speed_xy_mps=config.u_turn_max_speed_xy_mps,
+            max_angular_speed_radps=config.u_turn_max_angular_speed_radps,
+            xy_goal_tolerance_m=config.u_turn_position_tolerance_m,
+            yaw_goal_tolerance_rad=config.u_turn_yaw_tolerance_rad,
+            position_tolerance_m=config.u_turn_position_tolerance_m,
+            yaw_tolerance_rad=config.u_turn_yaw_tolerance_rad,
+            settle_time_sec=config.u_turn_settle_time_sec,
+            goal_retry_limit=config.special_action_retry_limit,
+        )
     if waypoint.action == PARK_ACTION:
         return WaypointExecutionPlan(
             profile_name='park',
@@ -136,7 +237,7 @@ def build_execution_plan(
     end_index = start_index
     while end_index + 1 < len(waypoints):
         next_action = waypoints[end_index + 1].action
-        if next_action in {TURN_LEFT_ACTION, TURN_RIGHT_ACTION, PARK_ACTION}:
+        if next_action in SPECIAL_ACTIONS:
             break
         end_index += 1
 
