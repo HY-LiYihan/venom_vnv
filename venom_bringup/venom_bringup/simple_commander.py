@@ -23,9 +23,18 @@ from geometry_msgs.msg import PoseStamped, Twist
 from lifecycle_msgs.srv import GetState
 from nav_msgs.msg import Odometry
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
-from rcl_interfaces.msg import ParameterDescriptor
+from rcl_interfaces.msg import Parameter, ParameterDescriptor, ParameterType, ParameterValue
+from rcl_interfaces.srv import SetParameters
 
 from venom_bringup.craic_waypoint_utils import CraicWaypoint, load_craic_waypoints
+from venom_bringup.waypoint_behavior import (
+    WaypointBehaviorConfig,
+    WaypointExecutionPlan,
+    build_execution_plan,
+    build_resume_plan,
+    normalize_angle,
+    quaternion_to_yaw,
+)
 
 
 def distance_xy(x1: float, y1: float, x2: float, y2: float) -> float:
@@ -62,6 +71,10 @@ class SimpleCommander(BasicNavigator):
             self._on_pose_update,
             20,
         )
+        self._controller_param_client = self.create_client(
+            SetParameters,
+            '/controller_server/set_parameters',
+        )
 
         self._current_pose_xy: Optional[tuple[float, float]] = None
         self._current_abs_waypoint_index = 0
@@ -71,6 +84,36 @@ class SimpleCommander(BasicNavigator):
         self._last_progress_time = time.monotonic()
         self._recovery_attempts = 0
         self._following_waypoints = False
+        self._current_yaw: Optional[float] = None
+        self._active_plan: Optional[WaypointExecutionPlan] = None
+        self._special_action_retry_count = 0
+        self._behavior_config = WaypointBehaviorConfig(
+            default_final_stop_distance_m=self.final_goal_stop_distance_m,
+            cruise_max_linear_speed_mps=self.cruise_max_linear_speed_mps,
+            cruise_max_speed_xy_mps=self.cruise_max_speed_xy_mps,
+            cruise_max_angular_speed_radps=self.cruise_max_angular_speed_radps,
+            cruise_xy_goal_tolerance_m=self.cruise_xy_goal_tolerance_m,
+            cruise_yaw_goal_tolerance_rad=self.cruise_yaw_goal_tolerance_rad,
+            left_turn_max_linear_speed_mps=self.left_turn_max_linear_speed_mps,
+            left_turn_max_speed_xy_mps=self.left_turn_max_speed_xy_mps,
+            left_turn_max_angular_speed_radps=self.left_turn_max_angular_speed_radps,
+            left_turn_position_tolerance_m=self.left_turn_position_tolerance_m,
+            left_turn_yaw_tolerance_rad=self.left_turn_yaw_tolerance_rad,
+            left_turn_settle_time_sec=self.left_turn_settle_time_sec,
+            right_turn_max_linear_speed_mps=self.right_turn_max_linear_speed_mps,
+            right_turn_max_speed_xy_mps=self.right_turn_max_speed_xy_mps,
+            right_turn_max_angular_speed_radps=self.right_turn_max_angular_speed_radps,
+            right_turn_position_tolerance_m=self.right_turn_position_tolerance_m,
+            right_turn_yaw_tolerance_rad=self.right_turn_yaw_tolerance_rad,
+            right_turn_settle_time_sec=self.right_turn_settle_time_sec,
+            park_max_linear_speed_mps=self.park_max_linear_speed_mps,
+            park_max_speed_xy_mps=self.park_max_speed_xy_mps,
+            park_max_angular_speed_radps=self.park_max_angular_speed_radps,
+            park_position_tolerance_m=self.park_position_tolerance_m,
+            park_yaw_tolerance_rad=self.park_yaw_tolerance_rad,
+            park_settle_time_sec=self.park_settle_time_sec,
+            special_action_retry_limit=self.special_action_retry_limit,
+        )
 
         self._log_loaded_route()
 
@@ -106,6 +149,30 @@ class SimpleCommander(BasicNavigator):
         self.declare_parameter('spin_angle_rad', 2.0 * math.pi)
         self.declare_parameter('recovery_time_allowance_sec', 15.0)
         self.declare_parameter('progress_check_period_sec', 0.2)
+        self.declare_parameter('left_turn_position_tolerance_m', 0.45)
+        self.declare_parameter('left_turn_yaw_tolerance_rad', 0.22)
+        self.declare_parameter('left_turn_settle_time_sec', 0.35)
+        self.declare_parameter('left_turn_max_linear_speed_mps', 0.8)
+        self.declare_parameter('left_turn_max_speed_xy_mps', 0.8)
+        self.declare_parameter('left_turn_max_angular_speed_radps', 0.9)
+        self.declare_parameter('right_turn_position_tolerance_m', 0.35)
+        self.declare_parameter('right_turn_yaw_tolerance_rad', 0.30)
+        self.declare_parameter('right_turn_settle_time_sec', 0.20)
+        self.declare_parameter('right_turn_max_linear_speed_mps', 0.65)
+        self.declare_parameter('right_turn_max_speed_xy_mps', 0.65)
+        self.declare_parameter('right_turn_max_angular_speed_radps', 0.8)
+        self.declare_parameter('park_position_tolerance_m', 0.18)
+        self.declare_parameter('park_yaw_tolerance_rad', 0.12)
+        self.declare_parameter('park_settle_time_sec', 1.0)
+        self.declare_parameter('park_max_linear_speed_mps', 0.35)
+        self.declare_parameter('park_max_speed_xy_mps', 0.35)
+        self.declare_parameter('park_max_angular_speed_radps', 0.45)
+        self.declare_parameter('cruise_max_linear_speed_mps', 2.0)
+        self.declare_parameter('cruise_max_speed_xy_mps', 2.0)
+        self.declare_parameter('cruise_max_angular_speed_radps', 1.6)
+        self.declare_parameter('cruise_xy_goal_tolerance_m', 0.5)
+        self.declare_parameter('cruise_yaw_goal_tolerance_rad', 0.4)
+        self.declare_parameter('special_action_retry_limit', 2)
 
     def _load_parameters(self) -> None:
         self.waypoint_file = self.get_parameter('waypoint_file').value
@@ -140,6 +207,78 @@ class SimpleCommander(BasicNavigator):
         )
         self.progress_check_period_sec = float(
             self.get_parameter('progress_check_period_sec').value
+        )
+        self.left_turn_position_tolerance_m = float(
+            self.get_parameter('left_turn_position_tolerance_m').value
+        )
+        self.left_turn_yaw_tolerance_rad = float(
+            self.get_parameter('left_turn_yaw_tolerance_rad').value
+        )
+        self.left_turn_settle_time_sec = float(
+            self.get_parameter('left_turn_settle_time_sec').value
+        )
+        self.left_turn_max_linear_speed_mps = float(
+            self.get_parameter('left_turn_max_linear_speed_mps').value
+        )
+        self.left_turn_max_speed_xy_mps = float(
+            self.get_parameter('left_turn_max_speed_xy_mps').value
+        )
+        self.left_turn_max_angular_speed_radps = float(
+            self.get_parameter('left_turn_max_angular_speed_radps').value
+        )
+        self.right_turn_position_tolerance_m = float(
+            self.get_parameter('right_turn_position_tolerance_m').value
+        )
+        self.right_turn_yaw_tolerance_rad = float(
+            self.get_parameter('right_turn_yaw_tolerance_rad').value
+        )
+        self.right_turn_settle_time_sec = float(
+            self.get_parameter('right_turn_settle_time_sec').value
+        )
+        self.right_turn_max_linear_speed_mps = float(
+            self.get_parameter('right_turn_max_linear_speed_mps').value
+        )
+        self.right_turn_max_speed_xy_mps = float(
+            self.get_parameter('right_turn_max_speed_xy_mps').value
+        )
+        self.right_turn_max_angular_speed_radps = float(
+            self.get_parameter('right_turn_max_angular_speed_radps').value
+        )
+        self.park_position_tolerance_m = float(
+            self.get_parameter('park_position_tolerance_m').value
+        )
+        self.park_yaw_tolerance_rad = float(
+            self.get_parameter('park_yaw_tolerance_rad').value
+        )
+        self.park_settle_time_sec = float(
+            self.get_parameter('park_settle_time_sec').value
+        )
+        self.park_max_linear_speed_mps = float(
+            self.get_parameter('park_max_linear_speed_mps').value
+        )
+        self.park_max_speed_xy_mps = float(
+            self.get_parameter('park_max_speed_xy_mps').value
+        )
+        self.park_max_angular_speed_radps = float(
+            self.get_parameter('park_max_angular_speed_radps').value
+        )
+        self.cruise_max_linear_speed_mps = float(
+            self.get_parameter('cruise_max_linear_speed_mps').value
+        )
+        self.cruise_max_speed_xy_mps = float(
+            self.get_parameter('cruise_max_speed_xy_mps').value
+        )
+        self.cruise_max_angular_speed_radps = float(
+            self.get_parameter('cruise_max_angular_speed_radps').value
+        )
+        self.cruise_xy_goal_tolerance_m = float(
+            self.get_parameter('cruise_xy_goal_tolerance_m').value
+        )
+        self.cruise_yaw_goal_tolerance_rad = float(
+            self.get_parameter('cruise_yaw_goal_tolerance_rad').value
+        )
+        self.special_action_retry_limit = int(
+            self.get_parameter('special_action_retry_limit').value
         )
 
     def _resolve_waypoint_file(self, configured_path: str) -> str:
@@ -182,6 +321,13 @@ class SimpleCommander(BasicNavigator):
     def _on_pose_update(self, msg: Odometry) -> None:
         position = msg.pose.pose.position
         self._current_pose_xy = (position.x, position.y)
+        orientation = msg.pose.pose.orientation
+        self._current_yaw = quaternion_to_yaw(
+            orientation.x,
+            orientation.y,
+            orientation.z,
+            orientation.w,
+        )
 
     def _to_pose_stamped(self, waypoint: CraicWaypoint) -> PoseStamped:
         pose = PoseStamped()
@@ -213,10 +359,11 @@ class SimpleCommander(BasicNavigator):
         if waypoint_index == self._last_logged_waypoint_index:
             return
         waypoint = self._waypoints[waypoint_index]
+        profile_name = self._active_plan.profile_name if self._active_plan is not None else 'unknown'
         self.get_logger().info(
             'Cruising to waypoint '
             f'{waypoint_index + 1}/{len(self._waypoints)} '
-            f'(task_index={waypoint.index}, action={waypoint.action_label}, '
+            f'(task_index={waypoint.index}, action={waypoint.action_label}, profile={profile_name}, '
             f'x={waypoint.x:.2f}, y={waypoint.y:.2f})'
         )
         self._last_logged_waypoint_index = waypoint_index
@@ -248,19 +395,70 @@ class SimpleCommander(BasicNavigator):
 
         self._waitForNodeToActivate('bt_navigator')
 
-    def _send_remaining_waypoints(self, start_index: int) -> bool:
-        if start_index >= len(self.poses_list):
+    def _make_double_parameter(self, name: str, value: float) -> Parameter:
+        return Parameter(
+            name=name,
+            value=ParameterValue(
+                type=ParameterType.PARAMETER_DOUBLE,
+                double_value=float(value),
+            ),
+        )
+
+    def _set_controller_parameters(self, plan: WaypointExecutionPlan) -> None:
+        if not self._controller_param_client.wait_for_service(timeout_sec=1.0):
+            self.get_logger().warn(
+                'controller_server/set_parameters not available; skipping action profile tuning.'
+            )
+            return
+
+        request = SetParameters.Request()
+        request.parameters = [
+            self._make_double_parameter('FollowPath.max_vel_x', plan.max_linear_speed_mps),
+            self._make_double_parameter('FollowPath.max_speed_xy', plan.max_speed_xy_mps),
+            self._make_double_parameter('FollowPath.max_vel_theta', plan.max_angular_speed_radps),
+            self._make_double_parameter('FollowPath.xy_goal_tolerance', plan.xy_goal_tolerance_m),
+            self._make_double_parameter(
+                'general_goal_checker.xy_goal_tolerance',
+                plan.xy_goal_tolerance_m,
+            ),
+            self._make_double_parameter(
+                'general_goal_checker.yaw_goal_tolerance',
+                plan.yaw_goal_tolerance_rad,
+            ),
+        ]
+        future = self._controller_param_client.call_async(request)
+        rclpy.spin_until_future_complete(self, future, timeout_sec=2.0)
+        if not future.done() or future.result() is None:
+            self.get_logger().warn('Timed out applying controller profile parameters.')
+            return
+
+        failed_reasons = [result.reason for result in future.result().results if not result.successful]
+        if failed_reasons:
+            self.get_logger().warn(
+                f'Controller profile update for {plan.profile_name} was only partially applied: '
+                f'{"; ".join(failed_reasons)}'
+            )
+
+    def _send_plan(self, plan: WaypointExecutionPlan, reset_special_retry_count: bool = True) -> bool:
+        if plan.start_index >= len(self.poses_list):
             return False
 
-        self._active_slice_start = start_index
-        self._current_abs_waypoint_index = start_index
-        accepted = self.followWaypoints(self.poses_list[start_index:])
+        self._set_controller_parameters(plan)
+        self._active_plan = plan
+        self._active_slice_start = plan.start_index
+        self._current_abs_waypoint_index = plan.start_index
+        accepted = self.followWaypoints(self.poses_list[plan.start_index : plan.end_index + 1])
         if accepted:
             self._following_waypoints = True
             self._last_progress_time = time.monotonic()
             self._last_progress_pose_xy = self._current_pose_xy
-            self._log_current_waypoint(start_index)
+            if reset_special_retry_count:
+                self._special_action_retry_count = 0
+            self._log_current_waypoint(plan.start_index)
         return accepted
+
+    def _send_remaining_waypoints(self, start_index: int) -> bool:
+        return self._send_plan(build_execution_plan(self._waypoints, start_index, self._behavior_config))
 
     def _wait_for_task_exit(self, timeout_sec: float) -> None:
         deadline = time.monotonic() + timeout_sec
@@ -333,13 +531,19 @@ class SimpleCommander(BasicNavigator):
             self.get_logger().error('Recovery behavior was rejected by Nav2.')
             return False
 
-        return self._send_remaining_waypoints(self._current_abs_waypoint_index)
+        if self._active_plan is None:
+            return self._send_remaining_waypoints(self._current_abs_waypoint_index)
+        return self._send_plan(build_resume_plan(self._active_plan, self._current_abs_waypoint_index))
 
     def _should_trigger_final_stop(self) -> bool:
-        if self._current_pose_xy is None or not self._waypoints:
+        if self._current_pose_xy is None or not self._waypoints or self._active_plan is None:
             return False
 
-        final_waypoint = self._waypoints[-1]
+        stop_distance_m = self._active_plan.stop_distance_m
+        if stop_distance_m is None:
+            return False
+
+        final_waypoint = self._waypoints[self._active_plan.goal_index]
         return (
             distance_xy(
                 self._current_pose_xy[0],
@@ -347,8 +551,71 @@ class SimpleCommander(BasicNavigator):
                 final_waypoint.x,
                 final_waypoint.y,
             )
-            <= self.final_goal_stop_distance_m
+            <= stop_distance_m
         )
+
+    def _is_active_special_action_satisfied(self) -> bool:
+        if self._active_plan is None or not self._active_plan.is_special_action:
+            return False
+        if self._current_pose_xy is None or self._current_yaw is None:
+            return False
+
+        goal_waypoint = self._waypoints[self._active_plan.goal_index]
+        position_error = distance_xy(
+            self._current_pose_xy[0],
+            self._current_pose_xy[1],
+            goal_waypoint.x,
+            goal_waypoint.y,
+        )
+        yaw_error = abs(normalize_angle(self._current_yaw - goal_waypoint.yaw))
+        if self._active_plan.position_tolerance_m is not None:
+            if position_error > self._active_plan.position_tolerance_m:
+                return False
+        if self._active_plan.yaw_tolerance_rad is not None:
+            if yaw_error > self._active_plan.yaw_tolerance_rad:
+                return False
+        return True
+
+    def _handle_special_action_completion(self) -> Optional[int]:
+        if self._active_plan is None or not self._active_plan.is_special_action:
+            return None
+
+        if self._is_active_special_action_satisfied():
+            if self._active_plan.settle_time_sec > 0.0:
+                self.get_logger().info(
+                    f'{self._active_plan.profile_name} goal satisfied; settling for '
+                    f'{self._active_plan.settle_time_sec:.2f}s.'
+                )
+                time.sleep(self._active_plan.settle_time_sec)
+            self._publish_zero_velocity()
+            next_index = self._active_plan.goal_index + 1
+            if next_index >= len(self._waypoints):
+                self.get_logger().info('Simple commander mission completed successfully.')
+                return 0
+            if not self._send_remaining_waypoints(next_index):
+                self.get_logger().error('Nav2 rejected the follow-up waypoint mission.')
+                return 1
+            return None
+
+        self._special_action_retry_count += 1
+        if self._special_action_retry_count > self._active_plan.goal_retry_limit:
+            goal_waypoint = self._waypoints[self._active_plan.goal_index]
+            self.get_logger().error(
+                f'{self._active_plan.profile_name} waypoint failed strict check at '
+                f'x={goal_waypoint.x:.2f}, y={goal_waypoint.y:.2f}.'
+            )
+            return 1
+
+        goal_waypoint = self._waypoints[self._active_plan.goal_index]
+        self.get_logger().warn(
+            f'{self._active_plan.profile_name} waypoint needs a tighter retry '
+            f'({self._special_action_retry_count}/{self._active_plan.goal_retry_limit}) '
+            f'at x={goal_waypoint.x:.2f}, y={goal_waypoint.y:.2f}.'
+        )
+        if not self._send_plan(self._active_plan, reset_special_retry_count=False):
+            self.get_logger().error('Nav2 rejected the strict action retry.')
+            return 1
+        return None
 
     def _update_feedback_state(self) -> None:
         if not self._following_waypoints:
@@ -404,7 +671,7 @@ class SimpleCommander(BasicNavigator):
 
             if self._should_trigger_final_stop():
                 self.get_logger().info(
-                    f'Within {self.final_goal_stop_distance_m:.2f} m of the final goal; forcing stop.'
+                    f'Within {self._active_plan.stop_distance_m:.2f} m of the final goal; forcing stop.'
                 )
                 self.cancelTask()
                 self._wait_for_task_exit(timeout_sec=2.0)
@@ -416,8 +683,19 @@ class SimpleCommander(BasicNavigator):
                 self._following_waypoints = False
                 self._publish_zero_velocity()
                 if result == TaskResult.SUCCEEDED:
-                    self.get_logger().info('Simple commander mission completed successfully.')
-                    return 0
+                    special_action_result = self._handle_special_action_completion()
+                    if special_action_result is not None:
+                        return special_action_result
+                    next_index = (
+                        self._active_plan.goal_index + 1 if self._active_plan is not None else len(self._waypoints)
+                    )
+                    if next_index >= len(self._waypoints):
+                        self.get_logger().info('Simple commander mission completed successfully.')
+                        return 0
+                    if not self._send_remaining_waypoints(next_index):
+                        self.get_logger().error('Nav2 rejected the follow-up waypoint mission.')
+                        return 1
+                    continue
                 if result == TaskResult.CANCELED:
                     self.get_logger().warn('Simple commander mission canceled.')
                     return 1
