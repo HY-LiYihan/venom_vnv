@@ -399,9 +399,7 @@ class CraicMissionCommander(BasicNavigator):
         request = SetParameters.Request()
         request.parameters = [
             self._make_double_parameter('FollowPath.max_vel_x', plan.max_linear_speed_mps),
-            self._make_double_parameter('FollowPath.max_speed_xy', plan.max_speed_xy_mps),
             self._make_double_parameter('FollowPath.max_vel_theta', plan.max_angular_speed_radps),
-            self._make_double_parameter('FollowPath.xy_goal_tolerance', plan.xy_goal_tolerance_m),
             self._make_double_parameter(
                 'general_goal_checker.xy_goal_tolerance',
                 plan.xy_goal_tolerance_m,
@@ -457,6 +455,17 @@ class CraicMissionCommander(BasicNavigator):
     def _run_recovery_behavior(self) -> bool:
         if self._recovery_attempts >= self.max_recovery_attempts:
             self.get_logger().error('Reached max recovery attempts; aborting mission.')
+            return False
+
+        if self.spin_angle_rad <= 0.0 and self.backup_distance_m <= 0.0:
+            self.get_logger().error(
+                'Progress watchdog triggered, but both spin_angle_rad and backup_distance_m are disabled. '
+                'Enable at least one recovery behavior or increase stuck_timeout_sec while testing.'
+            )
+            self.cancelTask()
+            self._following_waypoints = False
+            self._wait_for_task_exit(timeout_sec=2.0)
+            self._publish_zero_velocity()
             return False
 
         self._recovery_attempts += 1
