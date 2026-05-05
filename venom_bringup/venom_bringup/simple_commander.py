@@ -25,6 +25,7 @@ from nav_msgs.msg import Odometry
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
 from rcl_interfaces.msg import Parameter, ParameterDescriptor, ParameterType, ParameterValue
 from rcl_interfaces.srv import SetParameters
+from tf2_ros import Buffer, TransformListener
 
 from venom_bringup.craic_waypoint_utils import CraicWaypoint, load_craic_waypoints
 from venom_bringup.waypoint_behavior import (
@@ -75,6 +76,8 @@ class SimpleCommander(BasicNavigator):
             SetParameters,
             '/controller_server/set_parameters',
         )
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self, spin_thread=False)
 
         self._current_pose_xy: Optional[tuple[float, float]] = None
         self._current_abs_waypoint_index = 0
@@ -139,6 +142,12 @@ class SimpleCommander(BasicNavigator):
         self.declare_parameter('waypoint_frame_id', 'map')
         self.declare_parameter('pose_tracking_topic', '/odometry/global')
         self.declare_parameter('cmd_vel_topic', '/cmd_vel')
+        self.declare_parameter('robot_base_frame', 'base_link')
+        self.declare_parameter('global_frame', 'map')
+        self.declare_parameter('startup_wait_timeout_sec', 90.0)
+        self.declare_parameter('require_map_topic', True)
+        self.declare_parameter('require_pose_topic', True)
+        self.declare_parameter('require_tf_ready', True)
         self.declare_parameter('nav2_activation_timeout_sec', 60.0)
         self.declare_parameter('final_goal_stop_distance_m', 10.0)
         self.declare_parameter('stuck_timeout_sec', 10.0)
@@ -188,6 +197,14 @@ class SimpleCommander(BasicNavigator):
         self.waypoint_frame_id = self.get_parameter('waypoint_frame_id').value
         self.pose_tracking_topic = self.get_parameter('pose_tracking_topic').value
         self.cmd_vel_topic = self.get_parameter('cmd_vel_topic').value
+        self.robot_base_frame = self.get_parameter('robot_base_frame').value
+        self.global_frame = self.get_parameter('global_frame').value
+        self.startup_wait_timeout_sec = float(
+            self.get_parameter('startup_wait_timeout_sec').value
+        )
+        self.require_map_topic = bool(self.get_parameter('require_map_topic').value)
+        self.require_pose_topic = bool(self.get_parameter('require_pose_topic').value)
+        self.require_tf_ready = bool(self.get_parameter('require_tf_ready').value)
         self.nav2_activation_timeout_sec = float(
             self.get_parameter('nav2_activation_timeout_sec').value
         )
@@ -394,6 +411,52 @@ class SimpleCommander(BasicNavigator):
             )
 
         self._waitForNodeToActivate('bt_navigator')
+
+    def _wait_for_runtime_readiness(self) -> None:
+        self.get_logger().info(
+            'Waiting for runtime readiness '
+            f'(pose={self.require_pose_topic}, map={self.require_map_topic}, tf={self.require_tf_ready}, '
+            f'timeout={self.startup_wait_timeout_sec:.1f}s)...'
+        )
+        deadline = time.monotonic() + self.startup_wait_timeout_sec
+        last_status_log_time = 0.0
+
+        while time.monotonic() < deadline:
+            rclpy.spin_once(self, timeout_sec=0.1)
+
+            pose_ready = (not self.require_pose_topic) or (self._current_pose_xy is not None)
+            map_ready = (not self.require_map_topic) or ('/map' in self.get_topic_names_and_types())
+            tf_ready = True
+            if self.require_tf_ready:
+                try:
+                    tf_ready = self._tf_buffer.can_transform(
+                        self.global_frame,
+                        self.robot_base_frame,
+                        rclpy.time.Time(),
+                    )
+                except Exception:
+                    tf_ready = False
+
+            if pose_ready and map_ready and tf_ready:
+                self.get_logger().info(
+                    f'Runtime ready: pose topic "{self.pose_tracking_topic}", '
+                    f'global frame "{self.global_frame}", base frame "{self.robot_base_frame}".'
+                )
+                return
+
+            now = time.monotonic()
+            if now - last_status_log_time >= 2.0:
+                self.get_logger().info(
+                    f'Runtime not ready yet: pose_ready={pose_ready}, map_ready={map_ready}, tf_ready={tf_ready}'
+                )
+                last_status_log_time = now
+
+        raise RuntimeError(
+            'Timed out waiting for runtime readiness. '
+            f'pose_ready={self._current_pose_xy is not None}, '
+            f'map_ready={"/map" in self.get_topic_names_and_types()}, '
+            f'tf_ready={self._tf_buffer.can_transform(self.global_frame, self.robot_base_frame, rclpy.time.Time()) if self.require_tf_ready else True}.'
+        )
 
     def _make_double_parameter(self, name: str, value: float) -> Parameter:
         return Parameter(
@@ -668,6 +731,7 @@ class SimpleCommander(BasicNavigator):
 
     def run(self) -> int:
         self._wait_for_bt_navigator()
+        self._wait_for_runtime_readiness()
 
         if not self._send_remaining_waypoints(0):
             self.get_logger().error('Nav2 rejected the initial waypoint mission.')
