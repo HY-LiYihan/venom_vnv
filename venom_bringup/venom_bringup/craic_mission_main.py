@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from glob import glob
 import math
+from pathlib import Path
+import string
 import sys
 import time
 from typing import List, Optional
@@ -38,11 +41,21 @@ def distance_xy(x1: float, y1: float, x2: float, y2: float) -> float:
 class CraicMissionCommander(BasicNavigator):
     """Waypoint-driven competition mission node."""
 
-    def __init__(self) -> None:
-        super().__init__(node_name='craic_mission_main')
+    def __init__(
+        self,
+        node_name: str = 'craic_mission_main',
+        default_coordinate_mode: str = 'geodetic',
+        auto_discover_waypoint_file: bool = False,
+    ) -> None:
+        super().__init__(node_name=node_name)
+        self._default_coordinate_mode = default_coordinate_mode
+        self._auto_discover_waypoint_file = auto_discover_waypoint_file
 
         self._declare_parameters()
         self._load_parameters()
+
+        if not self.road_network_file and self._auto_discover_waypoint_file:
+            self.waypoint_file = self._resolve_waypoint_file(self.waypoint_file)
 
         self._route_node_ids: List[str] = []
         self._planned_route_name: Optional[str] = None
@@ -167,7 +180,7 @@ class CraicMissionCommander(BasicNavigator):
         )
         self.declare_parameter(
             'coordinate_mode',
-            'geodetic',
+            self._default_coordinate_mode,
             ParameterDescriptor(description='One of geodetic, cartesian_m, cartesian_cm, auto.'),
         )
         self.declare_parameter('map_origin_longitude_deg', 0.0)
@@ -491,6 +504,43 @@ class CraicMissionCommander(BasicNavigator):
         )
         self.special_action_retry_limit = int(
             self.get_parameter('special_action_retry_limit').value
+        )
+
+    def _resolve_waypoint_file(self, configured_path: str) -> str:
+        if configured_path:
+            path = Path(configured_path).expanduser()
+            if path.is_file():
+                return str(path)
+            raise FileNotFoundError(f'Configured waypoint_file does not exist: {path}')
+
+        candidates = []
+        cwd_candidate = Path.cwd() / 'waypoint.txt'
+        candidates.append(cwd_candidate)
+
+        if sys.platform.startswith('win'):
+            for drive_letter in string.ascii_uppercase:
+                candidates.append(Path(f'{drive_letter}:/waypoint.txt'))
+        else:
+            search_patterns = (
+                '/media/*/*/waypoint.txt',
+                '/media/*/waypoint.txt',
+                '/mnt/*/waypoint.txt',
+                '/mnt/waypoint.txt',
+                '/run/media/*/*/waypoint.txt',
+            )
+            for pattern in search_patterns:
+                candidates.extend(Path(path_str) for path_str in glob(pattern))
+
+        for candidate in candidates:
+            if candidate.is_file():
+                self.get_logger().info(f'Auto-discovered waypoint file: {candidate}')
+                return str(candidate)
+
+        searched = ', '.join(str(candidate) for candidate in candidates[:8])
+        raise FileNotFoundError(
+            'Unable to find waypoint.txt. '
+            'Set the waypoint_file parameter explicitly or mount the USB drive first. '
+            f'Searched examples: {searched}'
         )
 
     def _on_pose_update(self, msg: Odometry) -> None:
