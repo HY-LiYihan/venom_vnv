@@ -112,9 +112,13 @@ class MissionCommander(Node):
     def run_waypoint(self, waypoint_index: int, waypoint: WaypointSpec) -> bool:
         self.get_logger().info(
             f'Waypoint {waypoint_index + 1}/{len(self.mission_config.waypoints)}: '
-            f'{waypoint.name}'
+            f'{waypoint.name} ({waypoint.kind.value})'
         )
-        self.mission_manager.mark_waypoint_started(waypoint_index, waypoint.name)
+        self.mission_manager.mark_waypoint_started(
+            waypoint_index,
+            waypoint.name,
+            waypoint.kind.value,
+        )
 
         if waypoint.skip_navigation:
             self.get_logger().info(f'Skipping navigation for waypoint: {waypoint.name}')
@@ -144,11 +148,50 @@ class MissionCommander(Node):
         return True
 
     def navigate_to_waypoint(self, waypoint: WaypointSpec) -> bool:
-        self.navigator.go_to_waypoint(waypoint)
-        return self.navigator.wait_until_done()
+        max_attempts = waypoint.retry_count + 1
+        for attempt in range(1, max_attempts + 1):
+            self.mission_manager.save_state(
+                navigation_attempt=attempt,
+                navigation_attempts=max_attempts,
+                navigation_timeout_sec=waypoint.nav_timeout_sec,
+            )
+
+            if attempt > 1:
+                self.get_logger().warn(
+                    f'Retrying navigation to {waypoint.name}: attempt {attempt}/{max_attempts}'
+                )
+
+            self.navigator.go_to_waypoint(waypoint)
+            if self.navigator.wait_until_done(timeout_sec=waypoint.nav_timeout_sec):
+                self.mission_manager.save_state(
+                    last_navigation_success=True,
+                    last_navigation_waypoint=waypoint.name,
+                    last_navigation_attempt=attempt,
+                )
+                return True
+
+            self.mission_manager.save_state(
+                last_navigation_success=False,
+                last_navigation_waypoint=waypoint.name,
+                last_navigation_attempt=attempt,
+            )
+
+            if attempt < max_attempts:
+                cancel_confirmed = self.navigator.cancel()
+                recovery_performed = self.navigator.recover()
+                self.mission_manager.save_state(
+                    last_navigation_cancel_confirmed=cancel_confirmed,
+                    last_navigation_recovery_performed=recovery_performed,
+                )
+
+        return False
 
     def handle_navigation_failure(self, waypoint: WaypointSpec) -> None:
-        self.navigator.cancel()
+        cancel_confirmed = self.navigator.cancel()
+        self.mission_manager.save_state(
+            last_navigation_cancel_confirmed=cancel_confirmed,
+            last_navigation_recovery_performed=False,
+        )
         self.mission_manager.fail(f'navigation failed at waypoint: {waypoint.name}')
 
     def shutdown(self) -> None:

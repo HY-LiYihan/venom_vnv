@@ -296,6 +296,8 @@ ros2 launch venom_mission_commander mission_commander.launch.py \
 
 `mission_commander_nav2_sim.launch.py` 默认使用 `config/rmul_sim_mission.yaml`、`use_nav:=true`、`use_sim_time:=true`，适合在 Gazebo/RViz/Nav2 已经启动后直接验证整条链路。
 
+如果要跑 `competition_10x6` 比赛地图，先按 `../simulation/venom_nav_simulation/README.md` 中的“competition_10x6 比赛地图导航”启动 Gazebo、AMCL 和 Nav2，再把 `mission_config` 指向 `config/competition_10x6_mission.yaml`。
+
 ## 接真实 Nav2
 
 启动仿真导航栈后，把 `use_nav` 改成 `true`：
@@ -313,9 +315,9 @@ ros2 launch venom_mission_commander mission_commander.launch.py \
 ros2 launch venom_mission_commander mission_commander.launch.py use_nav:=true nav2_wait_mode:=full
 ```
 
-## 后续接比赛地图
+## 比赛地图配置
 
-建议保持“任务插件不变，只换地图坐标”的接入方式：
+当前仓库已有一份用于仿真验证的 `config/competition_10x6_mission.yaml`。后续如果拿到更新的场地图或重新标定 waypoint，建议保持“任务插件不变，只换地图坐标”的接入方式：
 
 1. 复制模板：
 
@@ -324,7 +326,7 @@ ros2 launch venom_mission_commander mission_commander.launch.py use_nav:=true na
       /opt/venom_nav_ws/src/venom_mission_commander/config/my_competition_mission.yaml
    ```
 
-2. 启动目标地图对应的 Gazebo/Nav2/RViz。
+2. 启动目标地图对应的 Gazebo/Nav2/RViz；`competition_10x6` 的完整 Docker 启动流程见 `../simulation/venom_nav_simulation/README.md`。
 3. 在 RViz 里逐个验证可达点，记录 `map` frame 下的 `x/y/yaw`。
 4. 只替换 `my_competition_mission.yaml` 中的坐标和地图说明，尽量保持路点名与任务名稳定。
 5. 用同一个 launch 跑新地图任务：

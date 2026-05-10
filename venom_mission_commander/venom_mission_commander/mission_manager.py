@@ -23,6 +23,8 @@ class MissionManager:
             'current_task_name': None,
             'phase': 'created',
             'loop': mission_config.loop,
+            'default_nav_timeout_sec': mission_config.default_nav_timeout_sec,
+            'default_retry_count': mission_config.default_retry_count,
         }
         self.history = []
 
@@ -49,10 +51,16 @@ class MissionManager:
     def restore_state(self) -> dict[str, Any]:
         return dict(self.state_data)
 
-    def mark_waypoint_started(self, waypoint_index: int, waypoint_name: str) -> None:
+    def mark_waypoint_started(
+        self,
+        waypoint_index: int,
+        waypoint_name: str,
+        waypoint_kind: str | None = None,
+    ) -> None:
         self.save_state(
             current_waypoint_index=waypoint_index,
             current_waypoint_name=waypoint_name,
+            current_waypoint_kind=waypoint_kind,
             current_task_index=None,
             current_task_name=None,
             phase='navigating',
