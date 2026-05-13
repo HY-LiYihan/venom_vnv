@@ -106,13 +106,122 @@ classify_place
 - `classify_place`：模拟分类放置，读取 `grasped_object`。
 - `wait`：模拟等待。
 
-## 本机工作区运行
+## 本机工作区运行（Nav2 + Point-LIO）
+
+`mission_commander_nav2_sim.launch.py` 依赖仿真导航栈已经启动。首次使用时需要把 `venom_mission_commander`、`rm_nav_bringup`、`rm_navigation`、`point_lio`、`livox_ros_driver2`、`teb_local_planner`、MID360 仿真和点云处理相关包一起构建。`rm_navigation` 的 Nav2 参数默认使用 `teb_local_planner::TebLocalPlannerROS`，如果漏构建 TEB，RViz 里会看到 navigation/localization inactive。
+
+### 第一次：安装依赖并构建
 
 ```bash
-cd /home/alex/venom_ws
-source /opt/ros/humble/setup.bash
-colcon build --symlink-install --packages-select venom_mission_commander
+cd ~/venom_ws
+
+export ROS_DISTRO=${ROS_DISTRO:-humble}
+source /opt/ros/$ROS_DISTRO/setup.bash
+
+sudo apt update
+sudo apt install -y \
+  ros-$ROS_DISTRO-navigation2 \
+  ros-$ROS_DISTRO-nav2-bringup \
+  ros-$ROS_DISTRO-nav2-simple-commander \
+  ros-$ROS_DISTRO-slam-toolbox \
+  ros-$ROS_DISTRO-spatio-temporal-voxel-layer \
+  ros-$ROS_DISTRO-gazebo-ros-pkgs \
+  ros-$ROS_DISTRO-rviz2 \
+  ros-$ROS_DISTRO-xacro \
+  ros-$ROS_DISTRO-joint-state-publisher \
+  ros-$ROS_DISTRO-robot-state-publisher \
+  ros-$ROS_DISTRO-pcl-ros \
+  ros-$ROS_DISTRO-pcl-conversions \
+  libgoogle-glog-dev \
+  libunwind-dev
+
+cp ~/venom_ws/src/venom_vnv/driver/livox_ros_driver2/package_ROS2.xml \
+   ~/venom_ws/src/venom_vnv/driver/livox_ros_driver2/package.xml
+
+rosdep install -r \
+  --from-paths \
+    src/venom_vnv/venom_mission_commander \
+    src/venom_vnv/simulation/venom_nav_simulation/src \
+    src/venom_vnv/localization/lio/Point-LIO \
+    src/venom_vnv/planning/navigation/venom_teb_controller \
+    src/venom_vnv/driver/livox_ros_driver2 \
+  --ignore-src \
+  --rosdistro $ROS_DISTRO \
+  -y
+
+colcon build \
+  --symlink-install \
+  --base-paths \
+    src/venom_vnv/venom_mission_commander \
+    src/venom_vnv/simulation/venom_nav_simulation/src \
+    src/venom_vnv/localization/lio/Point-LIO \
+    src/venom_vnv/planning/navigation/venom_teb_controller \
+    src/venom_vnv/driver/livox_ros_driver2 \
+  --cmake-args \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DROS_EDITION=ROS2 \
+    -DHUMBLE_ROS=humble
+```
+
+构建完成后，启动仿真导航栈。终端 1：
+
+```bash
+cd ~/venom_ws
+source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
 source install/setup.bash
+
+ros2 launch rm_nav_bringup bringup_sim.launch.py \
+  world:=RMUL \
+  mode:=nav \
+  lio:=pointlio \
+  localization:=slam_toolbox \
+  lio_rviz:=False \
+  nav_rviz:=True
+```
+
+等 Nav2、Point-LIO 和 RViz 启动后，终端 2：
+
+```bash
+cd ~/venom_ws
+source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
+source install/setup.bash
+
+ros2 launch venom_mission_commander mission_commander_nav2_sim.launch.py
+```
+
+### 之后：直接启动
+
+后续如果源码没有改动，不需要重新安装依赖和构建，只需要分别启动导航栈和 commander。
+
+终端 1：
+
+```bash
+cd ~/venom_ws
+source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
+source install/setup.bash
+
+ros2 launch rm_nav_bringup bringup_sim.launch.py \
+  world:=RMUL \
+  mode:=nav \
+  lio:=pointlio \
+  localization:=slam_toolbox \
+  lio_rviz:=False \
+  nav_rviz:=True
+```
+
+终端 2：
+
+```bash
+cd ~/venom_ws
+source /opt/ros/${ROS_DISTRO:-humble}/setup.bash
+source install/setup.bash
+
+ros2 launch venom_mission_commander mission_commander_nav2_sim.launch.py
+```
+
+如果只想跑不依赖 Nav2 的 mock 示例，可以使用：
+
+```bash
 ros2 launch venom_mission_commander mission_commander.launch.py use_nav:=false
 ```
 
@@ -121,7 +230,7 @@ ros2 launch venom_mission_commander mission_commander.launch.py use_nav:=false
 ```bash
 ros2 run venom_mission_commander mission_commander \
   --ros-args \
-  -p mission_config:=/home/alex/venom_ws/src/venom_vnv/venom_mission_commander/config/simple_mission.yaml \
+  -p mission_config:=~/venom_ws/src/venom_vnv/venom_mission_commander/config/simple_mission.yaml \
   -p use_nav:=false
 ```
 
@@ -187,6 +296,8 @@ ros2 launch venom_mission_commander mission_commander.launch.py \
 
 `mission_commander_nav2_sim.launch.py` 默认使用 `config/rmul_sim_mission.yaml`、`use_nav:=true`、`use_sim_time:=true`，适合在 Gazebo/RViz/Nav2 已经启动后直接验证整条链路。
 
+如果要跑 `competition_10x6` 比赛地图，先按 `../simulation/venom_nav_simulation/README.md` 中的“competition_10x6 比赛地图导航”启动 Gazebo、AMCL 和 Nav2，再把 `mission_config` 指向 `config/competition_10x6_mission.yaml`。
+
 ## 接真实 Nav2
 
 启动仿真导航栈后，把 `use_nav` 改成 `true`：
@@ -204,9 +315,9 @@ ros2 launch venom_mission_commander mission_commander.launch.py \
 ros2 launch venom_mission_commander mission_commander.launch.py use_nav:=true nav2_wait_mode:=full
 ```
 
-## 后续接比赛地图
+## 比赛地图配置
 
-建议保持“任务插件不变，只换地图坐标”的接入方式：
+当前仓库已有一份用于仿真验证的 `config/competition_10x6_mission.yaml`。后续如果拿到更新的场地图或重新标定 waypoint，建议保持“任务插件不变，只换地图坐标”的接入方式：
 
 1. 复制模板：
 
@@ -215,7 +326,7 @@ ros2 launch venom_mission_commander mission_commander.launch.py use_nav:=true na
       /opt/venom_nav_ws/src/venom_mission_commander/config/my_competition_mission.yaml
    ```
 
-2. 启动目标地图对应的 Gazebo/Nav2/RViz。
+2. 启动目标地图对应的 Gazebo/Nav2/RViz；`competition_10x6` 的完整 Docker 启动流程见 `../simulation/venom_nav_simulation/README.md`。
 3. 在 RViz 里逐个验证可达点，记录 `map` frame 下的 `x/y/yaw`。
 4. 只替换 `my_competition_mission.yaml` 中的坐标和地图说明，尽量保持路点名与任务名稳定。
 5. 用同一个 launch 跑新地图任务：
