@@ -70,6 +70,8 @@ setup(
             'venom_bringup.simple_commander:main',
             'craic_mission_main = '
             'venom_bringup.craic_mission_main:main',
+            'fake_vel_transform = '
+            'venom_bringup.fake_vel_transform:main',
         ],
     },
 )

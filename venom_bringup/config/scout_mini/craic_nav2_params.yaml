@@ -2,7 +2,7 @@ bt_navigator:
   ros__parameters:
     use_sim_time: false
     global_frame: map
-    robot_base_frame: base_link
+    robot_base_frame: base_link_fake
     odom_topic: /odometry/global
     bt_loop_duration: 10
     default_server_timeout: 20
@@ -76,7 +76,7 @@ controller_server:
       stateful: true
       plugin: nav2_controller::SimpleGoalChecker
       xy_goal_tolerance: 0.5
-      yaw_goal_tolerance: 0.4
+      yaw_goal_tolerance: 6.28
     FollowPath:
       plugin: teb_local_planner::TebLocalPlannerROS
       odom_topic: /odometry/global
@@ -84,8 +84,8 @@ controller_server:
       dt_ref: 0.3
       dt_hysteresis: 0.1
       max_samples: 500
-      global_plan_overwrite_orientation: true
-      allow_init_with_backwards_motion: false
+      global_plan_overwrite_orientation: false
+      allow_init_with_backwards_motion: true
       max_global_plan_lookahead_dist: 3.0
       global_plan_viapoint_sep: -1.0
       global_plan_prune_distance: 1.0
@@ -95,10 +95,11 @@ controller_server:
 
       max_vel_x: 2.0
       max_vel_x_backwards: 0.3
-      max_vel_y: 0.0
-      max_vel_theta: 1.6
+      max_vel_y: 2.0
+      max_vel_theta: 6.0
       acc_lim_x: 2.5
-      acc_lim_theta: 3.0
+      acc_lim_y: 2.0
+      acc_lim_theta: 6.0
       min_turning_radius: 0.0
       wheelbase: 0.0
       cmd_angle_instead_rotvel: false
@@ -108,7 +109,7 @@ controller_server:
         radius: 0.45
 
       xy_goal_tolerance: 0.5
-      yaw_goal_tolerance: 0.4
+      yaw_goal_tolerance: 6.28
       free_goal_vel: false
       complete_global_plan: true
 
@@ -131,13 +132,15 @@ controller_server:
       penalty_epsilon: 0.1
       obstacle_cost_exponent: 4.0
       weight_max_vel_x: 2.0
+      weight_max_vel_y: 2.0
       weight_max_vel_theta: 1.0
       weight_acc_lim_x: 1.0
+      weight_acc_lim_y: 1.0
       weight_acc_lim_theta: 1.0
-      weight_kinematics_nh: 1000.0
-      weight_kinematics_forward_drive: 1.0
-      weight_kinematics_turning_radius: 1.0
-      weight_optimaltime: 1.0
+      weight_kinematics_nh: 0.0
+      weight_kinematics_forward_drive: 0.0
+      weight_kinematics_turning_radius: 0.1
+      weight_optimaltime: 0.1
       weight_shortest_path: 0.0
       weight_obstacle: 100.0
       weight_inflation: 0.2
@@ -146,7 +149,7 @@ controller_server:
       weight_viapoint: 1.0
       weight_adapt_factor: 2.0
 
-      enable_homotopy_class_planning: true
+      enable_homotopy_class_planning: false
       enable_multithreading: true
       max_number_classes: 4
       selection_cost_hysteresis: 1.0
@@ -173,7 +176,7 @@ local_costmap:
       update_frequency: 10.0
       publish_frequency: 5.0
       global_frame: odom
-      robot_base_frame: base_link
+      robot_base_frame: base_link_fake
       rolling_window: true
       width: 20.0
       height: 20.0
@@ -229,7 +232,7 @@ global_costmap:
       update_frequency: 2.0
       publish_frequency: 1.0
       global_frame: map
-      robot_base_frame: base_link
+      robot_base_frame: base_link_fake
       rolling_window: true
       width: 120.0
       height: 120.0
@@ -314,7 +317,7 @@ behavior_server:
       - drive_on_heading
       - wait
     global_frame: odom
-    robot_base_frame: base_link
+    robot_base_frame: base_link_fake
     transform_tolerance: 0.2
     simulate_ahead_time: 2.0
     max_rotational_vel: 1.0
@@ -348,20 +351,20 @@ velocity_smoother:
     feedback: OPEN_LOOP
     max_velocity:
       - 2.5
-      - 0.0
-      - 1.6
+      - 2.0
+      - 6.0
     min_velocity:
       - -1.5
-      - 0.0
-      - -1.6
+      - -2.0
+      - -6.0
     max_accel:
       - 3.0
-      - 0.0
-      - 3.0
+      - 2.0
+      - 6.0
     max_decel:
       - -3.0
-      - 0.0
-      - -3.0
+      - -2.0
+      - -6.0
     odom_topic: /odometry/global
     odom_duration: 0.1
     deadband_velocity:

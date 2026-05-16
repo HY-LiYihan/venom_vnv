@@ -6,11 +6,11 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import DeclareLaunchArgument, GroupAction, IncludeLaunchDescription, TimerAction
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetRemap
 
 
 def generate_launch_description():
@@ -222,6 +222,31 @@ def generate_launch_description():
             'params_file': nav2_params_file,
         }.items(),
     )
+    nav2_group = GroupAction([
+        SetRemap(src='/cmd_vel', dst='/cmd_vel_raw'),
+        SetRemap(src='cmd_vel', dst='cmd_vel_raw'),
+        SetRemap(src='/cmd_vel_smoothed', dst='/cmd_vel_raw'),
+        SetRemap(src='cmd_vel_smoothed', dst='cmd_vel_raw'),
+        nav2_launch,
+    ])
+
+    fake_vel_transform_node = Node(
+        package='venom_bringup',
+        executable='fake_vel_transform',
+        name='fake_vel_transform',
+        output='screen',
+        parameters=[{
+            'use_sim_time': use_sim_time,
+            'input_cmd_vel_topic': '/cmd_vel_raw',
+            'output_cmd_vel_topic': '/cmd_vel',
+            'local_plan_topic': '/local_plan',
+            'odom_frame': 'odom',
+            'base_frame': 'base_link',
+            'fake_base_frame': 'base_link_fake',
+            'spin_speed': 0.0,
+            'publish_frequency_hz': 20.0,
+        }],
+    )
 
     camera_node = Node(
         package=LaunchConfiguration('camera_package'),
@@ -307,8 +332,9 @@ def generate_launch_description():
                 'map_origin_y_m': map_origin_y_m,
                 'map_origin_yaw_rad': map_origin_yaw_rad,
                 'pose_tracking_topic': '/odometry/global',
-                'cmd_vel_topic': '/cmd_vel',
+                'cmd_vel_topic': '/cmd_vel_raw',
                 'waypoint_frame_id': 'map',
+                'robot_base_frame': 'base_link_fake',
                 'use_first_waypoint_as_origin': True,
             }
         ],
@@ -340,7 +366,8 @@ def generate_launch_description():
             ipm_lane_projector_node,
             ekf_node,
             navsat_transform_node,
-            nav2_launch,
+            fake_vel_transform_node,
+            nav2_group,
             delayed_mission_node,
             rviz_node,
         ]
