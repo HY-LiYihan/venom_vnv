@@ -29,6 +29,8 @@ from venom_bringup.waypoint_behavior import (
     WaypointExecutionPlan,
     build_execution_plan,
     build_resume_plan,
+    compute_intermediate_turn_yaw,
+    compute_staging_pose,
     normalize_angle,
     quaternion_to_yaw,
 )
@@ -210,14 +212,14 @@ class CraicMissionCommander(BasicNavigator):
         self.declare_parameter('require_pose_topic', True)
         self.declare_parameter('require_tf_ready', True)
         self.declare_parameter('nav2_activation_timeout_sec', 60.0)
-        self.declare_parameter('final_goal_stop_distance_m', 10.0)
-        self.declare_parameter('stuck_timeout_sec', 10.0)
-        self.declare_parameter('stuck_progress_radius_m', 0.8)
-        self.declare_parameter('max_recovery_attempts', 5)
-        self.declare_parameter('backup_distance_m', 0.8)
+        self.declare_parameter('final_goal_stop_distance_m', 1.0)
+        self.declare_parameter('stuck_timeout_sec', 30.0)
+        self.declare_parameter('stuck_progress_radius_m', 0.2)
+        self.declare_parameter('max_recovery_attempts', 2)
+        self.declare_parameter('backup_distance_m', 0.3)
         self.declare_parameter('backup_speed_mps', 0.2)
-        self.declare_parameter('spin_angle_rad', 1.57)
-        self.declare_parameter('recovery_time_allowance_sec', 15.0)
+        self.declare_parameter('spin_angle_rad', 0.6)
+        self.declare_parameter('recovery_time_allowance_sec', 8.0)
         self.declare_parameter('progress_check_period_sec', 0.2)
         self.declare_parameter('left_turn_position_tolerance_m', 0.45)
         self.declare_parameter('left_turn_yaw_tolerance_rad', 0.22)
@@ -261,11 +263,11 @@ class CraicMissionCommander(BasicNavigator):
         self.declare_parameter('park_max_linear_speed_mps', 0.35)
         self.declare_parameter('park_max_speed_xy_mps', 0.35)
         self.declare_parameter('park_max_angular_speed_radps', 0.45)
-        self.declare_parameter('cruise_max_linear_speed_mps', 2.0)
-        self.declare_parameter('cruise_max_speed_xy_mps', 2.0)
-        self.declare_parameter('cruise_max_angular_speed_radps', 1.6)
-        self.declare_parameter('cruise_xy_goal_tolerance_m', 0.5)
-        self.declare_parameter('cruise_yaw_goal_tolerance_rad', 0.4)
+        self.declare_parameter('cruise_max_linear_speed_mps', 1.0)
+        self.declare_parameter('cruise_max_speed_xy_mps', 1.0)
+        self.declare_parameter('cruise_max_angular_speed_radps', 1.0)
+        self.declare_parameter('cruise_xy_goal_tolerance_m', 0.25)
+        self.declare_parameter('cruise_yaw_goal_tolerance_rad', 0.25)
         self.declare_parameter('action_control_rate_hz', 20.0)
         self.declare_parameter('action_heading_kp', 1.6)
         self.declare_parameter('action_linear_kp', 0.8)
@@ -277,6 +279,12 @@ class CraicMissionCommander(BasicNavigator):
         self.declare_parameter('park_action_timeout_sec', 15.0)
         self.declare_parameter('turn_creep_max_linear_mps', 0.25)
         self.declare_parameter('park_final_align_max_angular_speed_radps', 0.35)
+        self.declare_parameter('u_turn_staging_offset_m', 0.85)
+        self.declare_parameter('u_turn_intermediate_yaw_step_rad', 1.57)
+        self.declare_parameter('u_turn_stage_position_tolerance_m', 0.30)
+        self.declare_parameter('park_staging_offset_m', 0.55)
+        self.declare_parameter('park_stage_position_tolerance_m', 0.22)
+        self.declare_parameter('park_final_position_tolerance_m', 0.12)
         self.declare_parameter('special_action_retry_limit', 2)
 
     def _load_parameters(self) -> None:
@@ -502,6 +510,24 @@ class CraicMissionCommander(BasicNavigator):
         self.park_final_align_max_angular_speed_radps = float(
             self.get_parameter('park_final_align_max_angular_speed_radps').value
         )
+        self.u_turn_staging_offset_m = float(
+            self.get_parameter('u_turn_staging_offset_m').value
+        )
+        self.u_turn_intermediate_yaw_step_rad = float(
+            self.get_parameter('u_turn_intermediate_yaw_step_rad').value
+        )
+        self.u_turn_stage_position_tolerance_m = float(
+            self.get_parameter('u_turn_stage_position_tolerance_m').value
+        )
+        self.park_staging_offset_m = float(
+            self.get_parameter('park_staging_offset_m').value
+        )
+        self.park_stage_position_tolerance_m = float(
+            self.get_parameter('park_stage_position_tolerance_m').value
+        )
+        self.park_final_position_tolerance_m = float(
+            self.get_parameter('park_final_position_tolerance_m').value
+        )
         self.special_action_retry_limit = int(
             self.get_parameter('special_action_retry_limit').value
         )
@@ -685,6 +711,33 @@ class CraicMissionCommander(BasicNavigator):
         self._publish_zero_velocity()
         return False
 
+    def _creep_to_xy(
+        self,
+        target_x: float,
+        target_y: float,
+        position_tolerance_m: float,
+        max_linear_speed_mps: float,
+        max_angular_speed_radps: float,
+        timeout_sec: float,
+    ) -> bool:
+        synthetic_waypoint = CraicWaypoint(
+            index=-1,
+            x=target_x,
+            y=target_y,
+            yaw=0.0,
+            action=0,
+            source_a=target_x,
+            source_b=target_y,
+            action_label='staging',
+        )
+        return self._creep_to_waypoint(
+            synthetic_waypoint,
+            position_tolerance_m,
+            max_linear_speed_mps,
+            max_angular_speed_radps,
+            timeout_sec,
+        )
+
     def _execute_turn_action(
         self,
         waypoint: CraicWaypoint,
@@ -777,6 +830,46 @@ class CraicMissionCommander(BasicNavigator):
         ):
             return False
 
+        if self._current_yaw is not None:
+            intermediate_yaw = compute_intermediate_turn_yaw(
+                self._current_yaw,
+                waypoint.yaw,
+                self.u_turn_intermediate_yaw_step_rad,
+            )
+            if abs(normalize_angle(intermediate_yaw - waypoint.yaw)) > 1e-3:
+                self.get_logger().info(
+                    f'Running staged U-turn alignment via intermediate yaw {intermediate_yaw:.3f} rad.'
+                )
+                if not self._rotate_to_yaw(
+                    intermediate_yaw,
+                    max((plan.yaw_tolerance_rad or 0.16) * 1.4, 0.22),
+                    plan.max_angular_speed_radps,
+                    timeout_sec=max(self.turn_action_timeout_sec, 8.0),
+                ):
+                    return False
+                self._publish_zero_velocity()
+                self._sleep_with_spin(0.15)
+
+        staging_x, staging_y = compute_staging_pose(
+            waypoint.x,
+            waypoint.y,
+            waypoint.yaw,
+            self.u_turn_staging_offset_m,
+        )
+        if distance_xy(staging_x, staging_y, waypoint.x, waypoint.y) > 0.05:
+            self.get_logger().info(
+                f'U-turn staging to x={staging_x:.2f}, y={staging_y:.2f} before final heading lock.'
+            )
+            if not self._creep_to_xy(
+                staging_x,
+                staging_y,
+                self.u_turn_stage_position_tolerance_m,
+                min(plan.max_linear_speed_mps, self.turn_creep_max_linear_mps),
+                plan.max_angular_speed_radps,
+                timeout_sec=max(self.turn_action_timeout_sec, 8.0),
+            ):
+                return False
+
         self._publish_zero_velocity()
         self._sleep_with_spin(plan.settle_time_sec)
         return self._rotate_to_yaw(
@@ -791,9 +884,36 @@ class CraicMissionCommander(BasicNavigator):
         waypoint: CraicWaypoint,
         plan: WaypointExecutionPlan,
     ) -> bool:
+        staging_x, staging_y = compute_staging_pose(
+            waypoint.x,
+            waypoint.y,
+            waypoint.yaw,
+            self.park_staging_offset_m,
+        )
+        self.get_logger().info(
+            f'Parking approach via staging pose x={staging_x:.2f}, y={staging_y:.2f}.'
+        )
+        if not self._creep_to_xy(
+            staging_x,
+            staging_y,
+            self.park_stage_position_tolerance_m,
+            min(plan.max_linear_speed_mps, self.turn_creep_max_linear_mps),
+            min(plan.max_angular_speed_radps, self.park_final_align_max_angular_speed_radps),
+            timeout_sec=self.park_action_timeout_sec,
+        ):
+            return False
+
+        if not self._rotate_to_yaw(
+            waypoint.yaw,
+            max((plan.yaw_tolerance_rad or 0.12) * 1.5, 0.18),
+            min(plan.max_angular_speed_radps, self.park_final_align_max_angular_speed_radps),
+            timeout_sec=self.park_action_timeout_sec,
+        ):
+            return False
+
         if not self._creep_to_waypoint(
             waypoint,
-            plan.position_tolerance_m or 0.18,
+            min(plan.position_tolerance_m or 0.18, self.park_final_position_tolerance_m),
             plan.max_linear_speed_mps,
             min(plan.max_angular_speed_radps, self.park_final_align_max_angular_speed_radps),
             timeout_sec=self.park_action_timeout_sec,

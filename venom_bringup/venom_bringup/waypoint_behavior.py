@@ -39,14 +39,41 @@ def quaternion_to_yaw(x_value: float, y_value: float, z_value: float, w_value: f
     return math.atan2(siny_cosp, cosy_cosp)
 
 
+def compute_staging_pose(
+    goal_x: float,
+    goal_y: float,
+    goal_yaw: float,
+    offset_m: float,
+) -> tuple[float, float]:
+    """Return a point offset backwards from the goal along its heading."""
+    return (
+        goal_x - math.cos(goal_yaw) * offset_m,
+        goal_y - math.sin(goal_yaw) * offset_m,
+    )
+
+
+def compute_intermediate_turn_yaw(
+    current_yaw: float,
+    target_yaw: float,
+    max_turn_step_rad: float,
+) -> float:
+    """Return an intermediate yaw for large heading changes such as U-turns."""
+    yaw_error = normalize_angle(target_yaw - current_yaw)
+    if abs(yaw_error) <= max_turn_step_rad:
+        return target_yaw
+
+    turn_step = math.copysign(max_turn_step_rad, yaw_error)
+    return normalize_angle(current_yaw + turn_step)
+
+
 @dataclass(frozen=True)
 class WaypointBehaviorConfig:
     default_final_stop_distance_m: float
-    cruise_max_linear_speed_mps: float = 2.0
-    cruise_max_speed_xy_mps: float = 2.0
-    cruise_max_angular_speed_radps: float = 1.6
-    cruise_xy_goal_tolerance_m: float = 0.5
-    cruise_yaw_goal_tolerance_rad: float = 0.4
+    cruise_max_linear_speed_mps: float = 1.0
+    cruise_max_speed_xy_mps: float = 1.0
+    cruise_max_angular_speed_radps: float = 1.0
+    cruise_xy_goal_tolerance_m: float = 0.25
+    cruise_yaw_goal_tolerance_rad: float = 0.25
     left_turn_max_linear_speed_mps: float = 0.8
     left_turn_max_speed_xy_mps: float = 0.8
     left_turn_max_angular_speed_radps: float = 0.9

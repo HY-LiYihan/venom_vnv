@@ -3,6 +3,8 @@ from venom_bringup.waypoint_behavior import (
     WaypointBehaviorConfig,
     build_execution_plan,
     build_resume_plan,
+    compute_intermediate_turn_yaw,
+    compute_staging_pose,
 )
 
 
@@ -122,6 +124,40 @@ def test_u_turn_plan_uses_u_turn_profile():
     assert plan.profile_name == 'u_turn'
     assert plan.max_linear_speed_mps == config.u_turn_max_linear_speed_mps
     assert plan.xy_goal_tolerance_m == config.u_turn_position_tolerance_m
+
+
+def test_compute_staging_pose_offsets_backwards_from_goal_heading():
+    stage_x, stage_y = compute_staging_pose(5.0, 3.0, 0.0, 0.5)
+
+    assert stage_x == 4.5
+    assert stage_y == 3.0
+
+
+def test_compute_staging_pose_respects_heading_direction():
+    stage_x, stage_y = compute_staging_pose(2.0, 4.0, 3.141592653589793 / 2.0, 1.0)
+
+    assert abs(stage_x - 2.0) < 1e-6
+    assert abs(stage_y - 3.0) < 1e-6
+
+
+def test_intermediate_turn_yaw_caps_large_u_turn_step():
+    intermediate = compute_intermediate_turn_yaw(
+        current_yaw=0.0,
+        target_yaw=3.141592653589793,
+        max_turn_step_rad=1.57,
+    )
+
+    assert abs(intermediate - 1.57) < 1e-6
+
+
+def test_intermediate_turn_yaw_returns_target_for_small_heading_change():
+    intermediate = compute_intermediate_turn_yaw(
+        current_yaw=0.2,
+        target_yaw=0.6,
+        max_turn_step_rad=1.57,
+    )
+
+    assert abs(intermediate - 0.6) < 1e-6
 
 
 def test_last_default_segment_keeps_final_stop_distance():
