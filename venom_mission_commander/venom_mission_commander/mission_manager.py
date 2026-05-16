@@ -139,8 +139,11 @@ class MissionManager:
         self.save_state(
             had_task_failure=True,
             failed_tasks=failed_tasks,
+            last_task_name=task_name,
+            last_task_type=task_type,
             last_task_success=False,
             last_task_message=message,
+            last_task_data={},
         )
 
     def fail(self, reason: str) -> None:

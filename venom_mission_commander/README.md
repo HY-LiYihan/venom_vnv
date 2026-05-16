@@ -40,7 +40,7 @@ launch / ros2 run
   → 每个 task 通过 type 找到对应 TaskPlugin
   → 插件执行后返回 TaskExecutionResult
   → 任务结果写入 MissionManager 和 blackboard
-→ 所有 waypoint 完成后 mission 进入 COMPLETED / FAILED
+→ 所有 waypoint 完成后 mission 进入 COMPLETED / COMPLETED_WITH_ERRORS / FAILED
 ```
 
 运行时只有 `MissionCommander` 是真正的 ROS 2 node。`WaypointSpec`、`TaskSpec`、`MissionConfig` 都只是 Python 数据对象，用来承载 YAML 解析后的任务描述。任务插件默认也是普通 Python 对象，但它们可以通过 `TaskContext.node` 借用 `MissionCommander` 去创建 ROS service/action/topic client。

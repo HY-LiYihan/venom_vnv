@@ -80,7 +80,11 @@ class MissionCommander(Node):
         config_path = self.get_parameter('mission_config').value
         use_nav = bool(self.get_parameter('use_nav').value)
         mock_nav_delay_sec = float(self.get_parameter('mock_nav_delay_sec').value)
+        if mock_nav_delay_sec < 0.0:
+            raise ValueError('mock_nav_delay_sec must be non-negative')
         nav2_wait_mode = str(self.get_parameter('nav2_wait_mode').value)
+        if nav2_wait_mode not in {'bt_navigator', 'full'}:
+            raise ValueError('nav2_wait_mode must be one of: bt_navigator, full')
         self.navigator_ready_timeout_sec = float(
             self.get_parameter('navigator_ready_timeout_sec').value
         )
@@ -234,7 +238,7 @@ class MissionCommander(Node):
             self.status_reporter.log_snapshot('navigation_attempt_started', self.mission_manager)
 
             if attempt > 1:
-                self.get_logger().warn(
+                self.get_logger().warning(
                     f'Retrying navigation to {waypoint.name}: attempt {attempt}/{max_attempts}'
                 )
 
@@ -326,7 +330,7 @@ def main(args=None) -> None:
         if commander.configure():
             exit_code = 0 if commander.run() else 1
     except KeyboardInterrupt:
-        commander.get_logger().warn('Interrupted by user.')
+        commander.get_logger().warning('Interrupted by user.')
     except Exception as exc:
         commander.get_logger().error(f'Mission commander failed: {exc}')
     finally:

@@ -45,11 +45,11 @@ class MockWaypointNavigator:
         return True
 
     def cancel(self, timeout_sec: float = 2.0) -> bool:
-        self.node.get_logger().warn('[MOCK NAV] Cancel requested.')
+        self.node.get_logger().warning('[MOCK NAV] Cancel requested.')
         return True
 
     def recover(self) -> bool:
-        self.node.get_logger().warn('[MOCK NAV] Recovery requested.')
+        self.node.get_logger().warning('[MOCK NAV] Recovery requested.')
         return True
 
     def shutdown(self) -> None:
@@ -182,10 +182,15 @@ class Nav2WaypointNavigator:
 
     def _wait_for_task_done(self, timeout_sec: float) -> bool:
         deadline = time.monotonic() + max(timeout_sec, 0.0)
+        poll_interval_sec = 0.05
         while time.monotonic() <= deadline:
             if self.navigator.isTaskComplete():
                 self.node.get_logger().warning('[NAV2] Current task is canceled or complete.')
                 return True
+            remaining_sec = max(deadline - time.monotonic(), 0.0)
+            if remaining_sec <= 0.0:
+                break
+            time.sleep(min(poll_interval_sec, remaining_sec))
 
         self.node.get_logger().warning(
             f'[NAV2] Timed out waiting {timeout_sec:.1f}s for task cancellation.'
