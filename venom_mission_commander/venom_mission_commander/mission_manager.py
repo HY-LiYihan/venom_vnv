@@ -17,6 +17,7 @@ class MissionManager:
         self.state = MissionState.IDLE
         self.state_data = {
             'mission_id': mission_config.mission_id,
+            'total_waypoints': len(mission_config.waypoints),
             'current_waypoint_index': None,
             'current_waypoint_name': None,
             'current_task_index': None,
@@ -25,6 +26,7 @@ class MissionManager:
             'loop': mission_config.loop,
             'default_nav_timeout_sec': mission_config.default_nav_timeout_sec,
             'default_retry_count': mission_config.default_retry_count,
+            'startup_checks_status': 'not_run',
         }
         self.history = []
 
@@ -48,6 +50,27 @@ class MissionManager:
         self.state_data.update(kwargs)
         self.state_data['updated_at'] = time()
 
+    def mark_startup_checks_started(self) -> None:
+        self.save_state(phase='startup_checks', startup_checks_status='running')
+        self.transition_to(MissionState.PREFLIGHT, 'startup checks started')
+
+    def mark_startup_checks_completed(
+        self,
+        status: str,
+        results: list[dict[str, Any]],
+    ) -> None:
+        failures = [
+            result['name']
+            for result in results
+            if not result['success']
+        ]
+        self.save_state(
+            phase='startup_checks_done',
+            startup_checks_status=status,
+            startup_check_results=results,
+            startup_check_failures=failures,
+        )
+
     def restore_state(self) -> dict[str, Any]:
         return dict(self.state_data)
 
@@ -63,6 +86,9 @@ class MissionManager:
             current_waypoint_kind=waypoint_kind,
             current_task_index=None,
             current_task_name=None,
+            navigation_attempt=None,
+            navigation_attempts=None,
+            navigation_timeout_sec=None,
             phase='navigating',
         )
         self.transition_to(MissionState.NAVIGATING, f'waypoint={waypoint_name}')
@@ -83,7 +109,9 @@ class MissionManager:
             current_task_name=None,
             phase='waypoint_done',
             last_completed_waypoint=waypoint_name,
+            completed_waypoint_count=waypoint_index + 1,
         )
+        self.transition_to(MissionState.RUNNING, f'waypoint completed: {waypoint_name}')
 
     def mark_mission_completed(self) -> None:
         self.save_state(phase='completed')

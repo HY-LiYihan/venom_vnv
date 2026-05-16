@@ -2,6 +2,7 @@ import math
 import time
 from typing import Any
 
+import rclpy
 from geometry_msgs.msg import PoseStamped
 from rclpy.parameter import Parameter
 
@@ -12,9 +13,17 @@ class MockWaypointNavigator:
     def __init__(self, node: Any, delay_sec: float = 0.5):
         self.node = node
         self.delay_sec = delay_sec
+        self._ready = False
 
-    def wait_until_ready(self) -> None:
+    def wait_until_ready(self, timeout_sec: float | None = None) -> bool:
+        if self._ready:
+            return True
         self.node.get_logger().info('Mock navigator is ready; no Nav2 server required.')
+        self._ready = True
+        return True
+
+    def is_ready(self) -> bool:
+        return self._ready
 
     def go_to_waypoint(self, waypoint: WaypointSpec) -> None:
         self.node.get_logger().info(
@@ -54,19 +63,32 @@ class Nav2WaypointNavigator:
         self.node = node
         self.wait_mode = wait_mode
         self.navigator = BasicNavigator(node_name='mission_commander_nav2')
+        self._ready = False
         self._configure_use_sim_time(use_sim_time)
 
-    def wait_until_ready(self) -> None:
+    def wait_until_ready(self, timeout_sec: float | None = None) -> bool:
+        if self._ready:
+            return True
         self.node.get_logger().info(f'Waiting for Nav2 with mode: {self.wait_mode}')
+        if timeout_sec is not None:
+            return self._wait_until_ready_with_timeout(timeout_sec)
+
         if self.wait_mode == 'full':
             self.navigator.waitUntilNav2Active()
-            return
+            self._ready = True
+            return True
 
         if hasattr(self.navigator, '_waitForNodeToActivate'):
             self.navigator._waitForNodeToActivate('bt_navigator')
-            return
+            self._ready = True
+            return True
 
         self.navigator.waitUntilNav2Active()
+        self._ready = True
+        return True
+
+    def is_ready(self) -> bool:
+        return self._ready
 
     def _configure_use_sim_time(self, use_sim_time: bool) -> None:
         if self.navigator.has_parameter('use_sim_time'):
@@ -157,6 +179,79 @@ class Nav2WaypointNavigator:
         self.node.get_logger().warning(
             f'[NAV2] Timed out waiting {timeout_sec:.1f}s for task cancellation.'
         )
+        return False
+
+    def _wait_until_ready_with_timeout(self, timeout_sec: float) -> bool:
+        deadline = time.monotonic() + max(timeout_sec, 0.0)
+        if self.wait_mode == 'full':
+            if not self._wait_for_lifecycle_node_active('amcl', deadline):
+                self.node.get_logger().error(
+                    f'[NAV2] amcl did not become active within {timeout_sec:.1f}s.'
+                )
+                return False
+            if not self._wait_for_initial_pose(deadline):
+                self.node.get_logger().error(
+                    f'[NAV2] initial pose was not received within {timeout_sec:.1f}s.'
+                )
+                return False
+
+        if not self._wait_for_lifecycle_node_active('bt_navigator', deadline):
+            self.node.get_logger().error(
+                f'[NAV2] bt_navigator did not become active within {timeout_sec:.1f}s.'
+            )
+            return False
+
+        self.node.get_logger().info('[NAV2] Nav2 is ready for use.')
+        self._ready = True
+        return True
+
+    def _wait_for_initial_pose(self, deadline: float) -> bool:
+        if not hasattr(self.navigator, 'initial_pose_received'):
+            return True
+
+        while time.monotonic() < deadline:
+            if self.navigator.initial_pose_received:
+                return True
+
+            if hasattr(self.navigator, '_setInitialPose'):
+                self.node.get_logger().info('[NAV2] Setting initial pose and waiting for amcl_pose...')
+                self.navigator._setInitialPose()
+
+            remaining_sec = max(deadline - time.monotonic(), 0.0)
+            rclpy.spin_once(self.navigator, timeout_sec=min(1.0, remaining_sec))
+
+        return bool(self.navigator.initial_pose_received)
+
+    def _wait_for_lifecycle_node_active(self, node_name: str, deadline: float) -> bool:
+        from lifecycle_msgs.srv import GetState
+
+        node_service = f'{node_name}/get_state'
+        state_client = self.navigator.create_client(GetState, node_service)
+
+        while time.monotonic() < deadline:
+            remaining_sec = max(deadline - time.monotonic(), 0.0)
+            if state_client.wait_for_service(timeout_sec=min(0.5, remaining_sec)):
+                break
+            self.node.get_logger().info(f'[NAV2] {node_service} service not available, waiting...')
+        else:
+            return False
+
+        req = GetState.Request()
+        while time.monotonic() < deadline:
+            future = state_client.call_async(req)
+            remaining_sec = max(deadline - time.monotonic(), 0.0)
+            rclpy.spin_until_future_complete(
+                self.navigator,
+                future,
+                timeout_sec=min(0.5, remaining_sec),
+            )
+            if future.done() and future.result() is not None:
+                state = future.result().current_state.label
+                if state == 'active':
+                    return True
+                self.node.get_logger().info(f'[NAV2] {node_name} state={state}; waiting...')
+            time.sleep(0.2)
+
         return False
 
     def _format_feedback(self, feedback: Any, elapsed_sec: float) -> str:

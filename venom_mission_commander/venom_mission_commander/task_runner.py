@@ -4,9 +4,15 @@ from venom_mission_commander.task_plugins import TaskPluginRegistry
 
 
 class WaypointTaskRunner:
-    def __init__(self, registry: TaskPluginRegistry, mission_manager: MissionManager):
+    def __init__(
+        self,
+        registry: TaskPluginRegistry,
+        mission_manager: MissionManager,
+        status_reporter=None,
+    ):
         self.registry = registry
         self.mission_manager = mission_manager
+        self.status_reporter = status_reporter
 
     def run_tasks(
         self,
@@ -21,6 +27,7 @@ class WaypointTaskRunner:
                 f'{task_spec.name} ({task_spec.task_type})'
             )
             self.mission_manager.mark_task_started(task_index, task_spec.name)
+            self._log_status('task_started')
 
             try:
                 result = self.registry.get(task_spec.task_type).execute(context, task_spec)
@@ -32,6 +39,7 @@ class WaypointTaskRunner:
                     task_type=task_spec.task_type,
                     message=result_message,
                 )
+                self._log_status('task_failed')
                 if stop_on_failure:
                     self.mission_manager.fail(result_message)
                     return False
@@ -46,6 +54,7 @@ class WaypointTaskRunner:
             )
 
             if result.success:
+                self._log_status('task_completed')
                 context.node.get_logger().info(f'Task succeeded: {result.message}')
                 continue
 
@@ -55,8 +64,14 @@ class WaypointTaskRunner:
                 task_type=task_spec.task_type,
                 message=result.message,
             )
+            self._log_status('task_failed')
             if stop_on_failure:
                 self.mission_manager.fail(result.message)
                 return False
 
         return True
+
+    def _log_status(self, label: str) -> None:
+        if self.status_reporter is None:
+            return
+        self.status_reporter.log_snapshot(label, self.mission_manager)

@@ -33,6 +33,7 @@ launch / ros2 run
 → 读取 mission YAML
 → 解析成 MissionConfig / WaypointSpec / TaskSpec
 → 初始化导航器和任务插件
+→ 执行固定启动检查，确认配置、插件和导航器状态
 → 按顺序处理每个 waypoint
   → 导航到目标点，或按 skip_navigation 跳过导航
   → 到点后按顺序执行该 waypoint 下的 tasks
@@ -50,6 +51,7 @@ launch / ros2 run
 - `MissionLoader`：把 YAML 里的 `mission`、`waypoints`、`tasks` 解析成 Python 数据结构。
 - `WaypointNavigator`：导航适配层；mock 模式只打印并等待，Nav2 模式会把 `WaypointSpec` 转成 `PoseStamped` 后调用 `BasicNavigator.goToPose()`。
 - `WaypointTaskRunner`：任务调度器；到达路点后按顺序执行当前路点的 task 列表。
+- `MissionStatusReporter`：比赛状态输出器；把当前 waypoint、task、导航尝试和启动检查结果整理成稳定日志。
 - `TaskPluginRegistry`：任务插件表；根据 YAML 里的 `type` 找到对应插件。
 - `BaseTaskPlugin`：任务插件统一接口；后续接真实视觉、机械臂、语音时主要扩展这里。
 - `MissionManager`：轻量任务状态机和状态记录器；记录当前路点、当前任务、最近结果、失败原因和状态切换历史。
@@ -83,10 +85,22 @@ classify_place
 
 `MissionManager` 不直接执行任务，它只记录状态。任务开始时 `WaypointTaskRunner` 会调用 `mark_task_started()`，任务失败时调用 `mark_task_failed()`，如果配置了 `stop_on_task_failure: true`，则进一步调用 `fail()` 把 mission 切到 `FAILED`。
 
+## 启动检查和比赛状态输出
+
+启动检查由 `startup_checks.py` 中的 `StartupChecker` 提供，是固定内建逻辑，不需要在 YAML 里配置。Mission 正式进入 `RUNNING` 前会依次检查：
+
+- `mission_config`：做轻量语义检查，包括 waypoint 数量、重复 waypoint 名和非有限坐标；YAML 结构错误仍由 `MissionLoader` 在加载阶段直接报错。
+- `task_plugins_registered`：提前发现 YAML 中写了未注册的 task `type`。
+- `navigator_ready`：确认 mock/Nav2 navigator 已完成 ready 阶段；等待时间由 ROS 参数 `navigator_ready_timeout_sec` 控制，默认 30 秒。
+
+运行时会输出 `[STARTUP]` 和 `[STATUS]` 日志，方便比赛 2 号机位直接观察当前阶段、waypoint、task、导航尝试次数、最近任务结果和启动检查状态。
+
 ## 主要接口
 
 - `MissionCommander.configure()`：读取 YAML、注册任务插件、创建导航器、初始化任务状态。
 - `MissionCommander.run()`：执行完整 mission，可根据 YAML 的 `loop` 决定是否循环。
+- `MissionCommander.run_startup_checks()`：调用 `StartupChecker`，失败时 mission 不进入运行阶段。
+- `StartupChecker.run()`：执行固定启动检查，不依赖 YAML 扩展配置。
 - `MissionCommander.run_waypoint()`：处理单个路点，先导航，再执行该路点任务列表。
 - `MissionLoader.load(config_path)`：把 YAML 转成 `MissionConfig` / `WaypointSpec` / `TaskSpec`。
 - `MissionManager.transition_to()`：记录任务状态切换。

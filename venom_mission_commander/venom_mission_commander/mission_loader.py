@@ -4,7 +4,12 @@ from typing import Any
 
 import yaml
 
-from venom_mission_commander.models import MissionConfig, TaskSpec, WaypointKind, WaypointSpec
+from venom_mission_commander.models import (
+    MissionConfig,
+    TaskSpec,
+    WaypointKind,
+    WaypointSpec,
+)
 
 
 class MissionLoader:

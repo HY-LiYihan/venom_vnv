@@ -10,6 +10,8 @@ from venom_mission_commander.mission_loader import MissionLoader
 from venom_mission_commander.mission_manager import MissionManager
 from venom_mission_commander.models import MissionState, TaskContext, WaypointSpec
 from venom_mission_commander.navigator import MockWaypointNavigator, Nav2WaypointNavigator
+from venom_mission_commander.status_reporter import MissionStatusReporter
+from venom_mission_commander.startup_checks import StartupChecker
 from venom_mission_commander.task_plugins import TaskPluginRegistry
 from venom_mission_commander.task_runner import WaypointTaskRunner
 
@@ -40,6 +42,11 @@ class MissionCommander(Node):
             ParameterDescriptor(description='Nav2 wait mode: bt_navigator or full.'),
         )
         self._declare_parameter_if_needed(
+            'navigator_ready_timeout_sec',
+            30.0,
+            ParameterDescriptor(description='Startup wait timeout for mock/Nav2 navigator readiness.'),
+        )
+        self._declare_parameter_if_needed(
             'use_sim_time',
             False,
             ParameterDescriptor(description='Use Gazebo /clock for simulation runs.'),
@@ -48,7 +55,12 @@ class MissionCommander(Node):
         self.loader = MissionLoader()
         self.mission_manager = MissionManager(self.get_logger())
         self.registry = TaskPluginRegistry()
-        self.task_runner = WaypointTaskRunner(self.registry, self.mission_manager)
+        self.status_reporter = MissionStatusReporter(self.get_logger())
+        self.task_runner = WaypointTaskRunner(
+            self.registry,
+            self.mission_manager,
+            self.status_reporter,
+        )
         self.blackboard = {}
 
         self.mission_config = None
@@ -59,6 +71,11 @@ class MissionCommander(Node):
         use_nav = bool(self.get_parameter('use_nav').value)
         mock_nav_delay_sec = float(self.get_parameter('mock_nav_delay_sec').value)
         nav2_wait_mode = str(self.get_parameter('nav2_wait_mode').value)
+        self.navigator_ready_timeout_sec = float(
+            self.get_parameter('navigator_ready_timeout_sec').value
+        )
+        if self.navigator_ready_timeout_sec <= 0.0:
+            raise ValueError('navigator_ready_timeout_sec must be positive')
         use_sim_time = bool(self.get_parameter('use_sim_time').value)
 
         self.get_logger().info(f'Loading mission config: {config_path}')
@@ -70,7 +87,6 @@ class MissionCommander(Node):
             nav2_wait_mode,
             use_sim_time,
         )
-        self.navigator.wait_until_ready()
         self.mission_manager.create_mission(self.mission_config)
 
         self.get_logger().info(
@@ -83,8 +99,13 @@ class MissionCommander(Node):
         if self.mission_config is None or self.navigator is None:
             raise RuntimeError('MissionCommander.configure() must be called before run().')
 
+        if not self.run_startup_checks():
+            return False
+
         loop_count = 0
+        self.mission_manager.save_state(phase='running')
         self.mission_manager.transition_to(MissionState.RUNNING, 'mission started')
+        self.status_reporter.log_snapshot('mission_started', self.mission_manager)
 
         while rclpy.ok():
             loop_count += 1
@@ -92,15 +113,47 @@ class MissionCommander(Node):
             success = self.run_once()
 
             if not success:
+                self.status_reporter.log_snapshot('mission_failed', self.mission_manager)
                 return False
 
             if not self.mission_config.loop:
                 self.mission_manager.mark_mission_completed()
+                self.status_reporter.log_snapshot('mission_completed', self.mission_manager)
                 return self.mission_manager.state == MissionState.COMPLETED
 
             self.get_logger().info('Mission loop enabled; restarting route.')
 
         self.mission_manager.fail('rclpy shutdown requested')
+        self.status_reporter.log_snapshot('mission_failed', self.mission_manager)
+        return False
+
+    def run_startup_checks(self) -> bool:
+        if self.mission_config is None or self.navigator is None:
+            raise RuntimeError('MissionCommander.configure() must be called before startup checks.')
+
+        self.mission_manager.mark_startup_checks_started()
+        self.status_reporter.log_snapshot('startup_checks_started', self.mission_manager)
+
+        checker = StartupChecker(
+            mission_config=self.mission_config,
+            registry=self.registry,
+            navigator=self.navigator,
+            navigator_ready_timeout_sec=self.navigator_ready_timeout_sec,
+        )
+        results = checker.run()
+        result_records = [result.as_dict() for result in results]
+        checks_passed = all(result.success for result in results)
+        startup_status = 'passed' if checks_passed else 'failed'
+        self.mission_manager.mark_startup_checks_completed(startup_status, result_records)
+        self.status_reporter.log_startup_check_results(results)
+        self.status_reporter.log_snapshot('startup_checks_completed', self.mission_manager)
+
+        if checks_passed:
+            return True
+
+        failures = [result.name for result in results if not result.success]
+        self.mission_manager.fail(f'startup checks failed: {", ".join(failures)}')
+        self.status_reporter.log_snapshot('mission_failed', self.mission_manager)
         return False
 
     def run_once(self) -> bool:
@@ -119,6 +172,7 @@ class MissionCommander(Node):
             waypoint.name,
             waypoint.kind.value,
         )
+        self.status_reporter.log_snapshot('waypoint_started', self.mission_manager)
 
         if waypoint.skip_navigation:
             self.get_logger().info(f'Skipping navigation for waypoint: {waypoint.name}')
@@ -145,6 +199,7 @@ class MissionCommander(Node):
             return False
 
         self.mission_manager.mark_waypoint_done(waypoint_index, waypoint.name)
+        self.status_reporter.log_snapshot('waypoint_completed', self.mission_manager)
         return True
 
     def navigate_to_waypoint(self, waypoint: WaypointSpec) -> bool:
@@ -154,7 +209,9 @@ class MissionCommander(Node):
                 navigation_attempt=attempt,
                 navigation_attempts=max_attempts,
                 navigation_timeout_sec=waypoint.nav_timeout_sec,
+                last_navigation_success=None,
             )
+            self.status_reporter.log_snapshot('navigation_attempt_started', self.mission_manager)
 
             if attempt > 1:
                 self.get_logger().warn(
@@ -168,6 +225,10 @@ class MissionCommander(Node):
                     last_navigation_waypoint=waypoint.name,
                     last_navigation_attempt=attempt,
                 )
+                self.status_reporter.log_snapshot(
+                    'navigation_attempt_succeeded',
+                    self.mission_manager,
+                )
                 return True
 
             self.mission_manager.save_state(
@@ -175,6 +236,7 @@ class MissionCommander(Node):
                 last_navigation_waypoint=waypoint.name,
                 last_navigation_attempt=attempt,
             )
+            self.status_reporter.log_snapshot('navigation_attempt_failed', self.mission_manager)
 
             if attempt < max_attempts:
                 cancel_confirmed = self.navigator.cancel()
