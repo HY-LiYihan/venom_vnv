@@ -22,7 +22,7 @@ class WaypointTaskRunner:
     ) -> bool:
         for task_index, task_spec in enumerate(tasks):
             context.task_index = task_index
-            context.node.get_logger().info(
+            context.node.get_logger().debug(
                 f'Running task {task_index + 1}/{len(tasks)}: '
                 f'{task_spec.name} ({task_spec.task_type})'
             )
@@ -55,7 +55,7 @@ class WaypointTaskRunner:
 
             if result.success:
                 self._log_status('task_completed')
-                context.node.get_logger().info(f'Task succeeded: {result.message}')
+                context.node.get_logger().debug(f'Task succeeded: {result.message}')
                 continue
 
             context.node.get_logger().error(f'Task failed: {result.message}')

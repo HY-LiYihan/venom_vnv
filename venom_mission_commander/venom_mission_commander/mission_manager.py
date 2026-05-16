@@ -5,12 +5,16 @@ from venom_mission_commander.models import MissionConfig, MissionState
 
 
 class MissionManager:
-    def __init__(self, logger: Any | None = None):
+    def __init__(self, logger: Any | None = None, log_transitions: bool = False):
         self.logger = logger
+        self.log_transitions = log_transitions
         self.mission_id: str | None = None
         self.state = MissionState.IDLE
         self.state_data: dict[str, Any] = {}
         self.history: list[dict[str, Any]] = []
+
+    def set_transition_logging(self, enabled: bool) -> None:
+        self.log_transitions = enabled
 
     def create_mission(self, mission_config: MissionConfig) -> None:
         self.mission_id = mission_config.mission_id
@@ -40,7 +44,7 @@ class MissionManager:
             'reason': reason,
         }
         self.history.append(event)
-        if self.logger is not None:
+        if self.logger is not None and self.log_transitions:
             self.logger.info(
                 f'Mission state: {old_state.value} -> {new_state.value}'
                 + (f' ({reason})' if reason else '')

@@ -47,6 +47,16 @@ class MissionCommander(Node):
             ParameterDescriptor(description='Startup wait timeout for mock/Nav2 navigator readiness.'),
         )
         self._declare_parameter_if_needed(
+            'nav_feedback_log_interval_sec',
+            5.0,
+            ParameterDescriptor(description='Seconds between periodic Nav2 feedback logs; 0 disables.'),
+        )
+        self._declare_parameter_if_needed(
+            'log_state_transitions',
+            False,
+            ParameterDescriptor(description='Print low-level MissionManager state transitions.'),
+        )
+        self._declare_parameter_if_needed(
             'use_sim_time',
             False,
             ParameterDescriptor(description='Use Gazebo /clock for simulation runs.'),
@@ -76,6 +86,14 @@ class MissionCommander(Node):
         )
         if self.navigator_ready_timeout_sec <= 0.0:
             raise ValueError('navigator_ready_timeout_sec must be positive')
+        nav_feedback_log_interval_sec = float(
+            self.get_parameter('nav_feedback_log_interval_sec').value
+        )
+        if nav_feedback_log_interval_sec < 0.0:
+            raise ValueError('nav_feedback_log_interval_sec must be non-negative')
+        self.mission_manager.set_transition_logging(
+            bool(self.get_parameter('log_state_transitions').value)
+        )
         use_sim_time = bool(self.get_parameter('use_sim_time').value)
 
         self.get_logger().info(f'Loading mission config: {config_path}')
@@ -86,6 +104,7 @@ class MissionCommander(Node):
             mock_nav_delay_sec,
             nav2_wait_mode,
             use_sim_time,
+            nav_feedback_log_interval_sec,
         )
         self.mission_manager.create_mission(self.mission_config)
 
@@ -163,7 +182,7 @@ class MissionCommander(Node):
         return True
 
     def run_waypoint(self, waypoint_index: int, waypoint: WaypointSpec) -> bool:
-        self.get_logger().info(
+        self.get_logger().debug(
             f'Waypoint {waypoint_index + 1}/{len(self.mission_config.waypoints)}: '
             f'{waypoint.name} ({waypoint.kind.value})'
         )
@@ -175,8 +194,9 @@ class MissionCommander(Node):
         self.status_reporter.log_snapshot('waypoint_started', self.mission_manager)
 
         if waypoint.skip_navigation:
-            self.get_logger().info(f'Skipping navigation for waypoint: {waypoint.name}')
+            self.get_logger().debug(f'Skipping navigation for waypoint: {waypoint.name}')
             self.mission_manager.save_state(phase='navigation_skipped')
+            self.status_reporter.log_snapshot('navigation_skipped', self.mission_manager)
         elif not self.navigate_to_waypoint(waypoint):
             self.handle_navigation_failure(waypoint)
             return False
@@ -277,12 +297,14 @@ class MissionCommander(Node):
         mock_nav_delay_sec: float,
         nav2_wait_mode: str,
         use_sim_time: bool,
+        nav_feedback_log_interval_sec: float,
     ):
         if use_nav:
             return Nav2WaypointNavigator(
                 self,
                 wait_mode=nav2_wait_mode,
                 use_sim_time=use_sim_time,
+                feedback_log_interval_sec=nav_feedback_log_interval_sec,
             )
         return MockWaypointNavigator(self, delay_sec=mock_nav_delay_sec)
 
@@ -308,7 +330,7 @@ def main(args=None) -> None:
     except Exception as exc:
         commander.get_logger().error(f'Mission commander failed: {exc}')
     finally:
-        commander.get_logger().info(f'Final mission summary: {commander.mission_manager.summarize()}')
+        commander.status_reporter.log_final_summary(commander.mission_manager)
         commander.shutdown()
         rclpy.shutdown()
 

@@ -44,7 +44,16 @@ mission_commander = venom_mission_commander.mission_commander:main
 | `use_nav` | bool | `false` | `false` 使用 mock 导航；`true` 使用 Nav2 |
 | `mock_nav_delay_sec` | float | `0.5` | mock 导航每个 waypoint 的模拟等待时间 |
 | `nav2_wait_mode` | string | `bt_navigator` | Nav2 ready 等待方式，支持 `bt_navigator` 或 `full` |
+| `navigator_ready_timeout_sec` | float | `30.0` | 启动检查等待 mock/Nav2 navigator ready 的最长时间 |
+| `nav_feedback_log_interval_sec` | float | `5.0` | Nav2 周期反馈日志间隔；设为 `0` 可关闭 `[NAV2] Still navigating` |
+| `log_state_transitions` | bool | `false` | 是否打印 `MissionManager` 底层状态迁移日志 |
 | `use_sim_time` | bool | `false` | 仿真时设为 `true`，真机时设为 `false` |
+
+参数使用建议：
+
+- 常规比赛/调试看 `[STARTUP]`、`[STATUS]`、`[NAV2]` 和 `[SUMMARY]` 即可。
+- 如果 `[NAV2] Still navigating` 太频繁，调大 `nav_feedback_log_interval_sec`；如果不想要周期反馈，设为 `0`。
+- 如果要排查状态机内部迁移，再临时打开 `log_state_transitions:=true`，平时保持默认关闭。
 
 `mission_commander_nav2_sim.launch.py` 是一个固定参数的快捷 wrapper：
 
@@ -52,7 +61,63 @@ mission_commander = venom_mission_commander.mission_commander:main
 - 固定 `use_nav: true`。
 - 固定 `mock_nav_delay_sec: 0.0`。
 - 默认 `nav2_wait_mode:=bt_navigator`。
+- 默认 `navigator_ready_timeout_sec:=30.0`。
+- 默认 `nav_feedback_log_interval_sec:=5.0`。
+- 默认 `log_state_transitions:=false`。
 - 默认 `use_sim_time:=true`。
+
+## 运行日志结构
+
+Commander 日志按来源分成四类，默认优先保证比赛现场和调试终端可读：
+
+| 前缀 | 来源 | 什么时候出现 | 主要用途 |
+| --- | --- | --- | --- |
+| `[STARTUP]` | `StartupChecker` / `MissionStatusReporter` | mission 进入 `RUNNING` 前 | 看配置、插件和 navigator ready 检查是否通过 |
+| `[STATUS]` | `MissionStatusReporter` | mission / waypoint / navigation / task 关键事件 | 看当前阶段、当前 waypoint、当前 task、导航尝试和最近任务结果 |
+| `[NAV2]` | `Nav2WaypointNavigator` | Nav2 目标下发、周期反馈、超时、取消、恢复 | 看导航层是否还在走、是否超时、是否触发恢复 |
+| `[SUMMARY]` | `MissionStatusReporter` | 程序退出前 | 看最终状态、完成进度、失败原因和最后一次关键结果 |
+
+`[STATUS]` 不是周期性状态流，而是关键事件触发的完整快照。典型输出如下：
+
+```text
+[STARTUP] PASS mission_config
+	message: mission config is valid
+
+[STATUS] task_completed
+	state: executing_tasks | phase: executing_task | startup_checks: passed
+	waypoint: 2/8:task_point_1_pick(operation_stop)
+	task: 2:grasp_item_at_point_1
+	nav: attempt=1/2 timeout=35.0s last_success=True
+	last_task: grasp_item_at_point_1:True:grasp succeeded
+
+[NAV2] Still navigating: elapsed=7.0s, nav_time=2.2s, eta=2.3s
+
+[SUMMARY] mission
+	id: competition_10x6_nav2_mission_commander
+	state: completed
+	phase: completed
+	progress: 8/8 waypoint(s)
+	startup_checks: passed
+	last_waypoint: return_start_area
+	last_task: finish_delay:True:waited 0.50s
+	navigation: waypoint=return_start_area | attempt=1 | success=True
+```
+
+字段含义：
+
+- `state`：mission 顶层状态，例如 `running`、`navigating`、`executing_tasks`、`completed`、`failed`。
+- `phase`：当前细分阶段，例如 `startup_checks`、`navigating`、`navigation_skipped`、`executing_task`、`waypoint_done`。
+- `waypoint`：格式为 `当前序号/总数:名称(kind)`，其中 `kind` 来自 YAML 的 waypoint 语义标签。
+- `task`：当前正在执行的 task；`-` 表示当前没有 task。
+- `nav`：当前导航尝试次数、该 waypoint 的导航超时和最近导航结果。
+- `last_task`：最近一次完成或失败的 task 结果，不一定等于当前正在执行的 task。
+
+默认不会打印 `MissionManager` 的底层状态迁移日志，但状态历史仍记录在内存中。需要看到 `Mission state: old -> new` 时，启动时追加：
+
+```bash
+ros2 launch venom_mission_commander mission_commander.launch.py \
+  log_state_transitions:=true
+```
 
 ## 常用启动矩阵
 

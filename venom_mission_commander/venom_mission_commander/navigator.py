@@ -57,11 +57,18 @@ class MockWaypointNavigator:
 
 
 class Nav2WaypointNavigator:
-    def __init__(self, node: Any, wait_mode: str = 'bt_navigator', use_sim_time: bool = False):
+    def __init__(
+        self,
+        node: Any,
+        wait_mode: str = 'bt_navigator',
+        use_sim_time: bool = False,
+        feedback_log_interval_sec: float = 5.0,
+    ):
         from nav2_simple_commander.robot_navigator import BasicNavigator
 
         self.node = node
         self.wait_mode = wait_mode
+        self.feedback_log_interval_sec = max(feedback_log_interval_sec, 0.0)
         self.navigator = BasicNavigator(node_name='mission_commander_nav2')
         self._ready = False
         self._configure_use_sim_time(use_sim_time)
@@ -111,9 +118,8 @@ class Nav2WaypointNavigator:
         from nav2_simple_commander.robot_navigator import TaskResult as Nav2TaskResult
 
         started_at = time.monotonic()
-        poll_count = 0
+        last_feedback_log_elapsed = -self.feedback_log_interval_sec
         while not self.navigator.isTaskComplete():
-            poll_count += 1
             elapsed_sec = time.monotonic() - started_at
             if timeout_sec is not None and elapsed_sec > timeout_sec:
                 self.node.get_logger().error(
@@ -122,10 +128,15 @@ class Nav2WaypointNavigator:
                 return False
 
             feedback = self.navigator.getFeedback()
-            if feedback is not None and poll_count % 10 == 0:
+            if (
+                feedback is not None
+                and self.feedback_log_interval_sec > 0.0
+                and elapsed_sec - last_feedback_log_elapsed >= self.feedback_log_interval_sec
+            ):
                 self.node.get_logger().info(
                     f'[NAV2] Still navigating: {self._format_feedback(feedback, elapsed_sec)}'
                 )
+                last_feedback_log_elapsed = elapsed_sec
 
         result = self.navigator.getResult()
         if result == Nav2TaskResult.SUCCEEDED:

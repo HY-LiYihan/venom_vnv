@@ -85,7 +85,7 @@ classify_place
 
 `MissionManager` 不直接执行任务，它只记录状态。任务开始时 `WaypointTaskRunner` 会调用 `mark_task_started()`，任务失败时调用 `mark_task_failed()`，如果配置了 `stop_on_task_failure: true`，则进一步调用 `fail()` 把 mission 切到 `FAILED`。
 
-## 启动检查和比赛状态输出
+## 启动检查和状态输出
 
 启动检查由 `startup_checks.py` 中的 `StartupChecker` 提供，是固定内建逻辑，不需要在 YAML 里配置。Mission 正式进入 `RUNNING` 前会依次检查：
 
@@ -93,7 +93,11 @@ classify_place
 - `task_plugins_registered`：提前发现 YAML 中写了未注册的 task `type`。
 - `navigator_ready`：确认 mock/Nav2 navigator 已完成 ready 阶段；等待时间由 ROS 参数 `navigator_ready_timeout_sec` 控制，默认 30 秒。
 
-运行时会输出 `[STARTUP]` 和 `[STATUS]` 日志，方便比赛 2 号机位直接观察当前阶段、waypoint、task、导航尝试次数、最近任务结果和启动检查状态。
+运行时会输出 `[STARTUP]`、`[STATUS]`、`[NAV2]` 和 `[SUMMARY]` 日志，方便比赛 2 号机位直接观察当前阶段、waypoint、task、导航尝试次数、最近任务结果和启动检查状态。
+
+默认日志按“比赛可读”优先，不再把底层状态迁移历史直接刷到屏幕。需要排查状态机细节时，可通过 ROS 参数 `log_state_transitions:=true` 重新打开 `MissionManager` 的状态迁移日志。
+
+日志类别、示例格式和相关 ROS 参数见 `docs/ENTRYPOINTS_AND_CONFIG.md` 的“运行日志结构”章节。
 
 ## 主要接口
 
@@ -103,7 +107,7 @@ classify_place
 - `StartupChecker.run()`：执行固定启动检查，不依赖 YAML 扩展配置。
 - `MissionCommander.run_waypoint()`：处理单个路点，先导航，再执行该路点任务列表。
 - `MissionLoader.load(config_path)`：把 YAML 转成 `MissionConfig` / `WaypointSpec` / `TaskSpec`。
-- `MissionManager.transition_to()`：记录任务状态切换。
+- `MissionManager.transition_to()`：记录任务状态切换；默认不直接打印，历史仍保存在 `MissionManager.history`。
 - `MissionManager.save_state()`：保存当前路点、当前任务、最近任务结果等运行状态。
 - `MockWaypointNavigator`：默认导航器，不依赖 Nav2。
 - `Nav2WaypointNavigator`：真实 Nav2 导航器，使用 `nav2_simple_commander.BasicNavigator.goToPose()`。
