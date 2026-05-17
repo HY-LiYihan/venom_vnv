@@ -212,13 +212,8 @@ wrapper launch 只做参数包装，不写 mission 逻辑：
 
 ### 应该做什么
 
-- 将 commander 包纳入 Docker Humble bootstrap 的 symlink/build 流程。
-- 更新 Docker README，不再要求手动：
-
-  ```bash
-  ln -sfn /workspaces/venom_vnv/venom_mission_commander /opt/venom_nav_ws/src/venom_mission_commander
-  ```
-
+- 保持 commander 包纳入 Docker Humble bootstrap 的 symlink/build 流程。
+- 更新 Docker README 和入口说明，避免重新引入手动 `ln -sfn` 步骤。
 - 如果项目有 CI，把 commander 包加入 build/test 范围。
 - 保留 mock mission 作为快速 smoke test。
 

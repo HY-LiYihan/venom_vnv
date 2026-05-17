@@ -5,6 +5,7 @@ from typing import Any
 
 class MissionState(str, Enum):
     IDLE = 'idle'
+    PREFLIGHT = 'preflight'
     RUNNING = 'running'
     NAVIGATING = 'navigating'
     EXECUTING_TASKS = 'executing_tasks'

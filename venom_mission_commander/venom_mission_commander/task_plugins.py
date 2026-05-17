@@ -187,6 +187,12 @@ class TaskPluginRegistry:
             raise RuntimeError(f'Unknown task type: {task_type}; available: {available}')
         return self.plugins[task_type]
 
+    def has(self, task_type: str) -> bool:
+        return task_type in self.plugins
+
+    def available_types(self) -> list[str]:
+        return sorted(self.plugins)
+
     def register_default_plugins(self, node: Any) -> None:
         for plugin in [
             DetectItemTaskPlugin(),

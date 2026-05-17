@@ -1,0 +1,131 @@
+# Approximate CRAIC 2026 inspection challenge route for the 10 m x 6 m field.
+# Coordinates use map/Gazebo convention: lower-left inner corner is (0, 0), upper-right is (10, 6).
+# This version follows the AI-generated geometry summary provided by the team.
+# kind is a mission semantic label; current executor still uses goToPose for each non-skipped waypoint.
+map:
+  name: competition_10x6
+  frame_id: map
+  source: rm_nav_bringup/map/competition_10x6.yaml
+  note: Rough field layout from image-derived coordinates; replace waypoints after RViz/Gazebo validation.
+
+mission:
+  id: competition_10x6_nav2_mission_commander
+  loop: false
+  stop_on_task_failure: true
+  nav_timeout_sec: 35.0
+  retry_count: 1
+
+waypoints:
+  - name: start_area
+    description: 起停区中心附近；仿真默认机器人从这里出生，所以跳过第一次导航。
+    kind: operation_stop
+    frame_id: map
+    x: 1.10
+    y: 1.10
+    yaw: 0.0
+    skip_navigation: true
+    tasks:
+      - name: start_delay
+        type: wait
+        seconds: 0.5
+
+  - name: pass_speed_bump_lower
+    description: 下方减速带中心通过点，坐标来自新几何描述。
+    kind: pass_through
+    frame_id: map
+    x: 6.00
+    y: 1.50
+    yaw: 0.0
+    nav_timeout_sec: 20.0
+
+  - name: task_point_1_pick
+    description: 任务点一在右下角区域；停车点位于目标台座左侧，面向目标。
+    kind: operation_stop
+    frame_id: map
+    x: 7.85
+    y: 1.50
+    yaw: 0.0
+    tasks:
+      - name: detect_item_at_point_1
+        type: detect_item
+        target: competition_object
+        mock_confidence: 0.92
+        mock_delay_sec: 0.3
+      - name: grasp_item_at_point_1
+        type: grasp_item
+        source: detected_item
+        gripper: piper
+        mock_delay_sec: 0.4
+
+  - name: pass_speed_bump_upper
+    description: 上方减速带中心通过点，坐标来自新几何描述。
+    kind: pass_through
+    frame_id: map
+    x: 6.00
+    y: 4.50
+    yaw: 0.0
+    nav_timeout_sec: 20.0
+
+  - name: task_point_2_meter_voice
+    description: 任务点二在右上角区域；停车点位于电表板左侧，面向目标。
+    kind: operation_stop
+    frame_id: map
+    x: 7.85
+    y: 4.50
+    yaw: 0.0
+    tasks:
+      - name: read_meter_at_point_2
+        type: read_meter
+        meter_id: competition_meter
+        mock_value: "220.0V"
+        mock_confidence: 0.9
+        mock_delay_sec: 0.3
+      - name: voice_report_meter
+        type: voice_report
+        mock_delay_sec: 0.2
+
+  - name: task_point_3_flame_tracking
+    description: 任务点三在上方中间；停车点在宽任务区下缘，面向火灾目标板。
+    kind: operation_stop
+    frame_id: map
+    x: 5.00
+    y: 4.15
+    yaw: 1.5708
+    tasks:
+      - name: detect_flame_at_point_3
+        type: detect_flame
+        mock_confidence: 0.88
+        mock_delay_sec: 0.3
+      - name: track_flame_at_point_3
+        type: track_flame
+        source: flame_detection
+        mock_tracking_steps: 3
+        mock_step_delay_sec: 0.2
+
+  - name: task_point_4_classify_place
+    description: 任务点四在左上角区域；停车点位于台座右侧，面向目标。
+    kind: operation_stop
+    frame_id: map
+    x: 2.10
+    y: 4.50
+    yaw: 3.1416
+    tasks:
+      - name: classify_and_place_object
+        type: classify_place
+        source: grasped_object
+        mock_category: competition_category_a
+        place_zone: bin_a
+        mock_delay_sec: 0.4
+
+  - name: return_start_area
+    description: 返回起停区中心附近停车。
+    kind: return_park
+    frame_id: map
+    x: 1.10
+    y: 1.10
+    yaw: 3.1416
+    nav_timeout_sec: 45.0
+    tasks:
+      - name: finish_delay
+        type: wait
+        seconds: 0.5
